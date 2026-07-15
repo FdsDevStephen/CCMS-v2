@@ -65,7 +65,7 @@ def render_summary(result: dict) -> None:
     col1.metric("Survey Numbers", len(result.get("survey_numbers", [])))
     col2.metric("Sections", len(result.get("sections", [])))
     col3.metric("Acts", len(result.get("acts", [])))
-    col4.metric("Primary Act", "Yes" if result.get("primary_act") else "No")
+    # col4.metric("Primary Act", "Yes" if result.get("primary_act") else "No")
 
 
 def render_act_section_mapping(mapping: list) -> None:
@@ -162,12 +162,12 @@ def main() -> None:
 
         st.divider()
 
-        render_items(
-            title="📜 Sections",
-            items=result.get("sections", []),
-            empty_message="No sections found.",
-            style="info",
-        )
+        # render_items(
+        #     title="📜 Sections",
+        #     items=result.get("sections", []),
+        #     empty_message="No sections found.",
+        #     style="info",
+        # )
 
     with right_column:
         render_items(
@@ -177,15 +177,15 @@ def main() -> None:
             style="success",
         )
 
-        st.divider()
+        # st.divider()
 
-        st.subheader("⭐ Primary Act")
-        primary_act = result.get("primary_act")
+        # st.subheader("⭐ Primary Act")
+        # primary_act = result.get("primary_act")
 
-        if primary_act:
-            st.success(primary_act)
-        else:
-            st.warning("None")
+        # if primary_act:
+        #     st.success(primary_act)
+        # else:
+        #     st.warning("None")
 
     st.divider()
     render_act_section_mapping(result.get("act_section_mapping", []))
