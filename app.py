@@ -11,7 +11,6 @@ from streamlit_pdf_viewer import pdf_viewer
 
 from extractor.extractor import LegalExtractor
 
-
 # ==========================================================
 # PAGE CONFIG
 # ==========================================================
@@ -27,9 +26,7 @@ st.set_page_config(
 
 st.title("AI-Powered Legal Document Analysis System")
 
-st.write(
-    "Upload a Karnataka High Court judgment PDF to extract legal information."
-)
+st.write("Upload a Karnataka High Court judgment PDF to extract legal information.")
 
 # ==========================================================
 # FILE UPLOAD
@@ -70,95 +67,92 @@ if uploaded_file is not None:
 
     st.divider()
 
-    st.header("Extraction Result")
+    st.header("📄 Extraction Result")
+
+    # ------------------------------------------------------
+    # Case Number
+    # ------------------------------------------------------
 
     st.subheader("Case Number")
-    st.write(result.get("case_number", ""))
 
-    st.subheader("Survey Numbers")
+    st.info(result.get("case_number", "Not Available"))
 
-    survey_numbers = result.get("survey_numbers", [])
+    # ------------------------------------------------------
+    # Two Columns
+    # ------------------------------------------------------
 
-    if survey_numbers:
-
-        for survey in survey_numbers:
-            st.write(f"• {survey}")
-
-    else:
-
-        st.write("No Survey Numbers Found.")
-
-    st.subheader("Sections")
-
-    sections = result.get("sections", [])
-
-    if sections:
-
-        for section in sections:
-            st.write(f"• {section}")
-
-    else:
-
-        st.write("No Sections Found.")
-
-    st.subheader("Acts")
-
-    acts = result.get("acts", [])
-
-    if acts:
-
-        for act in acts:
-            st.write(f"• {act}")
-
-    else:
-
-        st.write("No Acts Found.")
-
-    st.subheader("Primary Act")
-
-    st.write(result.get("primary_act") or "None")
+    col1, col2 = st.columns(2)
 
     # ======================================================
-    # PDF PREVIEW
+    # LEFT COLUMN
     # ======================================================
 
-    st.divider()
+    with col1:
 
-    st.header("PDF Preview")
+        st.subheader("📍 Survey Numbers")
 
-    pdf_viewer(
-        input=uploaded_file.getvalue(),
-        width=900,
-        height=900,
-    )
+        surveys = result.get("survey_numbers", [])
+
+        if surveys:
+
+            for survey in surveys:
+                st.write(f"• {survey}")
+
+        else:
+
+            st.caption("No Survey Numbers Found.")
+
+        st.divider()
 
     # ======================================================
-    # DOWNLOAD JSON
+    # RIGHT COLUMN
+    # ======================================================
+
+    with col2:
+
+        st.subheader("⚖️ Acts")
+
+        acts = result.get("acts", [])
+
+        if acts:
+
+            for act in acts:
+                st.write(f"• {act}")
+
+        else:
+
+            st.caption("No Acts Found.")
+
+        st.divider()
+
+    # ======================================================
+    # ACT → SECTION MAPPING
     # ======================================================
 
     st.divider()
 
-    st.header("Download JSON")
+    st.subheader("📚 Act → Section Mapping")
 
-    json_string = json.dumps(
-        result,
-        indent=4,
-        ensure_ascii=False,
-    )
+    mapping = result.get("act_section_mapping", [])
 
-    st.download_button(
-        label="Download JSON",
-        data=json_string,
-        file_name=f"{Path(uploaded_file.name).stem}.json",
-        mime="application/json",
-    )
+    if mapping:
 
-    # ======================================================
-    # RAW JSON
-    # ======================================================
+        for item in mapping:
 
-    st.divider()
+            with st.container(border=True):
 
-    st.header("Raw JSON")
+                st.markdown(f"### {item['act']}")
 
-    st.json(result)
+                if item["sections"]:
+
+                    for section in item["sections"]:
+
+                        st.write(f"• {section}")
+
+                else:
+
+                    st.caption("No Associated Sections")
+
+    else:
+
+        st.caption("No Mapping Found.")

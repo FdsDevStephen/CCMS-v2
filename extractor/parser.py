@@ -29,6 +29,7 @@ class LLMResponseParser:
 
             return {
                 "acts": data.get("acts", []),
+                "act_section_mapping": data.get("act_section_mapping", []),
                 "sections": data.get("sections", []),
                 "primary_act": data.get("primary_act"),
             }
@@ -50,6 +51,7 @@ class LLMResponseParser:
 
                 return {
                     "acts": data.get("acts", []),
+                    "act_section_mapping": data.get("act_section_mapping", []),
                     "sections": data.get("sections", []),
                     "primary_act": data.get("primary_act"),
                 }
@@ -69,8 +71,9 @@ class LLMResponseParser:
 
             return {
                 "acts": data.get("acts", []),
-                "sections": [],
-                "primary_act": None,
+                "act_section_mapping": data.get("act_section_mapping", []),
+                "sections": data.get("sections", []),
+                "primary_act": data.get("primary_act"),
             }
 
         except json.JSONDecodeError:
@@ -85,6 +88,7 @@ class LLMResponseParser:
 
         return {
             "acts": [],
+            "act_section_mapping": [],
             "sections": [],
             "primary_act": None,
         }

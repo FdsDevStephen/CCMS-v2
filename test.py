@@ -9,7 +9,7 @@ from extractor.extractor import LegalExtractor
 # ==========================================================
 
 PDF_PATH = Path(
-    r"C:\Users\steph\OneDrive\Desktop\WP-13437-2022-B.pdf"
+    r"C:\Users\steph\OneDrive\Desktop\WP-12860-2025-B.pdf"
 )
 
 # ==========================================================

@@ -65,7 +65,17 @@ class LegalExtractor:
         regex = RegexExtractor(text)
 
         regex_result = regex.extract_all()
-        
+
+        from extractor.normalizer import Normalizer
+
+        regex_result["survey_numbers"] = Normalizer.normalize_survey_numbers(
+            regex_result["survey_numbers"]
+        )
+
+        regex_result["sections"] = Normalizer.normalize_sections(
+            regex_result["sections"]
+        )
+
         print("=" * 80)
         print("RAW SURVEY NUMBERS")
         print("=" * 80)
@@ -82,6 +92,7 @@ class LegalExtractor:
         chunks = self.chunker.split(text)
 
         all_acts = []
+        all_mappings = []
 
         print(f"\nTotal Chunks : {len(chunks)}\n")
 
@@ -91,7 +102,10 @@ class LegalExtractor:
 
         for index, chunk in enumerate(chunks, start=1):
 
-            prompt = build_act_extraction_prompt(chunk)
+            prompt = build_act_extraction_prompt(
+                chunk,
+                regex_result["sections"],
+            )
 
             try:
 
@@ -100,10 +114,10 @@ class LegalExtractor:
                 result = LLMResponseParser.parse(llm_response)
 
                 acts = result.get("acts", [])
-
-                print(f"Acts Found : {acts}")
+                mappings = result.get("act_section_mapping", [])
 
                 all_acts.extend(acts)
+                all_mappings.extend(mappings)
 
             except Exception as e:
 
@@ -116,7 +130,10 @@ class LegalExtractor:
         # ======================================================
 
         llm_result = {
-            "acts": all_acts
+            "acts": Normalizer.normalize_acts(all_acts),
+            "act_section_mapping": Normalizer.normalize_act_section_mapping(
+                all_mappings
+            ),
         }
 
         # ======================================================
@@ -128,16 +145,25 @@ class LegalExtractor:
             "survey_numbers": regex_result["survey_numbers"],
             "sections": regex_result["sections"],
             "acts": llm_result["acts"],
+            "act_section_mapping": llm_result["act_section_mapping"],
             "primary_act": None,
         }
 
         final_result = Validator.validate(final_result)
-        
+
         print("=" * 80)
         print("FINAL SURVEY NUMBERS")
         print("=" * 80)
 
         for survey in final_result["survey_numbers"]:
             print(repr(survey))
+
+        print("=" * 80)
+        print("FINAL RESULT")
+        print("=" * 80)
+
+        import json
+
+        print(json.dumps(final_result, indent=4))
 
         return final_result

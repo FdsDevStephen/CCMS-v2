@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import re
 
+from extractor.act_normalizer import ActNormalizer
+
+ACT_NORMALIZER = ActNormalizer()
 
 class Normalizer:
     """
@@ -313,17 +316,14 @@ class Normalizer:
     ) -> list[str]:
 
         normalized = []
-        seen = set()
 
-        # ----------------------------------------------
-        # Remove exact duplicates
-        # ----------------------------------------------
+        seen = set()
 
         for act in acts:
 
-            act = " ".join(act.split())
+            act = ACT_NORMALIZER.normalize(act)
 
-            act = act.rstrip(".,;:")
+            act = " ".join(act.split())
 
             if act and act not in seen:
 
@@ -331,38 +331,229 @@ class Normalizer:
 
                 normalized.append(act)
 
-        # ----------------------------------------------
-        # Remove partial Act names
-        # Example:
-        # Karnataka Land Revenue Act
-        # Land Revenue Act
-        # ----------------------------------------------
+        return normalized
 
-        filtered = []
 
-        for act in normalized:
+    @staticmethod
+    def normalize_act_section_mapping(
+        mappings: list[dict],
+    ) -> list[dict]:
+        """
+        Normalize Act -> Section mapping.
+        """
 
-            keep = True
+        merged = {}
 
-            for other in normalized:
+        for item in mappings:
 
-                if act == other:
+            act = ACT_NORMALIZER.normalize(
+                item.get("act", "")
+            )
+
+            act = " ".join(act.split())
+
+            if not act:
+                continue
+
+            if act not in merged:
+
+                merged[act] = []
+
+            for section in item.get("sections", []):
+
+                section = Normalizer.normalize_section_name(section)
+                
+                if re.fullmatch(r"\d+\.\d+", section):
                     continue
 
-                if len(other) <= len(act):
-                    continue
+                # ---------------------------------------
+                # Expand combined sections
+                # 19(1)and(2)
+                # 19(1) and 19(2)
+                # 19(1)&19(2)
+                # ---------------------------------------
 
-                # Ignore year while comparing
-                act_compare = re.sub(r",\s*\d{4}$", "", act, flags=re.IGNORECASE)
-                other_compare = re.sub(r",\s*\d{4}$", "", other, flags=re.IGNORECASE)
+                values = []
 
-                if other_compare.lower().endswith(act_compare.lower()):
+                m = re.fullmatch(
+                    r"(\d+)\((\d+)\)\s*(?:and|&|,)\s*(?:\1)?\(?(\d+)\)?",
+                    section,
+                    flags=re.IGNORECASE,
+                )
 
-                    keep = False
-                    break
+                if m:
 
-            if keep:
+                    values = [
+                        f"{m.group(1)}({m.group(2)})",
+                        f"{m.group(1)}({m.group(3)})",
+                    ]
 
-                filtered.append(act)
+                else:
 
-        return filtered
+                    values = [section]
+
+                for value in values:
+
+                    if value not in merged[act]:
+
+                        merged[act].append(value)
+
+        result = []
+
+        for act, sections in merged.items():
+
+            result.append(
+                {
+                    "act": act,
+                    "sections": sections,
+                }
+            )
+
+        return result
+    
+    @staticmethod
+    def normalize_section_name(section: str) -> str:
+        """
+        Normalize a single Section/Rule representation.
+        """
+
+        import re
+
+        VALID_SUFFIXES = {
+            "A",
+            "B",
+            "C",
+            "D",
+            "AA",
+            "AB",
+            "AC",
+            "AD",
+            "BA",
+            "BB",
+            "BC",
+        }
+
+        section = section.strip()
+
+        section = re.sub(
+            r"^(Section|Sections|Sec\.?|Secs\.?|S\.|u/s|U/S)\s*",
+            "",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        section = " ".join(section.split())
+        
+        
+        
+        section = re.sub(
+            r"(\))(?=(and|or)\b)",
+            r"\1 ",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        section = re.sub(
+            r"([)&,])(?=\S)",
+            r"\1 ",
+            section,
+        )
+        # ----------------------------------------------
+        # Remove trailing connector words
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"\s+(?:of|under|the|to|for)\b.*$",
+            "",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        # ----------------------------------------------
+        # OCR Cleanup
+        # 79 B -> 79B
+        # 95 AB -> 95AB
+        # ----------------------------------------------
+
+        m = re.fullmatch(
+            r"(\d+)\s+([A-Za-z]{1,3})",
+            section,
+        )
+
+        if m and m.group(2).upper() in VALID_SUFFIXES:
+
+            section = f"{m.group(1)}{m.group(2).upper()}"
+
+        # ----------------------------------------------
+        # Rule 108 D (3) -> Rule 108-D(3)
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"Rule\s+(\d+)\s+([A-Z])\s*\((\d+)\)",
+            r"Rule \1-\2(\3)",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        # ----------------------------------------------
+        # Rule 108-D-3 -> Rule 108-D(3)
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"Rule\s+(\d+)-([A-Z])-([0-9]+)",
+            r"Rule \1-\2(\3)",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        # ----------------------------------------------
+        # 108 D (3) -> 108-D(3)
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"(\d+)\s+([A-Z])\s*\((\d+)\)",
+            r"\1-\2(\3)",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        # ----------------------------------------------
+        # 108-D-3 -> 108-D(3)
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"(\d+)-([A-Z])-([0-9]+)",
+            r"\1-\2(\3)",
+            section,
+            flags=re.IGNORECASE,
+        )
+
+        # ----------------------------------------------
+        # 136 (2) -> 136(2)
+        # ----------------------------------------------
+
+        section = re.sub(
+            r"(\d+)\s+\((\d+)\)",
+            r"\1(\2)",
+            section,
+        )
+
+        # ----------------------------------------------
+        # Final Cleanup
+        # ----------------------------------------------
+
+        section = re.sub(r"\s+\(", "(", section)
+        section = re.sub(r"\)\s+", ")", section)
+        section = re.sub(r"\s*,\s*", ",", section)
+        section = re.sub(r"\s*-\s*", "-", section)
+
+        section = re.sub(
+            r"(Sec|Section|Sections)$",
+            "",
+            section,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        section = section.rstrip(".,;:")
+
+        return section
