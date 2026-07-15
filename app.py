@@ -1,5 +1,5 @@
 """
-Streamlit Application for AI-Powered Legal Document Analysis.
+Streamlit app for AI-powered legal document analysis.
 """
 
 from pathlib import Path
@@ -11,148 +11,197 @@ from streamlit_pdf_viewer import pdf_viewer
 
 from extractor.extractor import LegalExtractor
 
-# ==========================================================
-# PAGE CONFIG
-# ==========================================================
+
+APP_TITLE = "AI-Powered Legal Document Analysis"
+APP_DESCRIPTION = (
+    "Upload a Karnataka High Court judgment PDF to extract structured legal information."
+)
+
 
 st.set_page_config(
-    page_title="AI-Powered Legal Document Analysis",
+    page_title=APP_TITLE,
+    page_icon="⚖️",
     layout="wide",
 )
 
-# ==========================================================
-# TITLE
-# ==========================================================
 
-st.title("AI-Powered Legal Document Analysis System")
+@st.cache_resource
+def get_extractor() -> LegalExtractor:
+    """Load the extractor once and reuse it across reruns."""
+    return LegalExtractor()
 
-st.write("Upload a Karnataka High Court judgment PDF to extract legal information.")
 
-# ==========================================================
-# FILE UPLOAD
-# ==========================================================
+def save_uploaded_pdf(uploaded_file, temp_dir: str) -> Path:
+    """Save uploaded PDF to a temporary path."""
+    safe_name = Path(uploaded_file.name).name
+    pdf_path = Path(temp_dir) / safe_name
+    pdf_path.write_bytes(uploaded_file.getbuffer())
+    return pdf_path
 
-uploaded_file = st.file_uploader(
-    "Upload PDF",
-    type=["pdf"],
-)
 
-# ==========================================================
-# RUN PIPELINE
-# ==========================================================
+def render_items(title: str, items: list, empty_message: str, style: str = "info") -> None:
+    """Render a list of extracted items."""
+    st.subheader(title)
 
-if uploaded_file is not None:
+    if not items:
+        st.caption(empty_message)
+        return
 
-    st.success(f"Selected File: **{uploaded_file.name}**")
+    for item in items:
+        if style == "success":
+            st.success(item)
+        elif style == "warning":
+            st.warning(item)
+        else:
+            st.info(item)
 
-    with st.spinner("Analyzing document..."):
 
-        # --------------------------------------------------
-        # Save uploaded PDF temporarily
-        # --------------------------------------------------
+def render_summary(result: dict) -> None:
+    """Render extraction summary metrics."""
+    st.header("📄 Extraction Summary")
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+    col1, col2, col3, col4 = st.columns(4)
 
-            pdf_path = Path(temp_dir) / uploaded_file.name
+    col1.metric("Survey Numbers", len(result.get("survey_numbers", [])))
+    col2.metric("Sections", len(result.get("sections", [])))
+    col3.metric("Acts", len(result.get("acts", [])))
+    col4.metric("Primary Act", "Yes" if result.get("primary_act") else "No")
 
-            pdf_path.write_bytes(uploaded_file.getbuffer())
 
-            extractor = LegalExtractor()
+def render_act_section_mapping(mapping: list) -> None:
+    """Render act-to-section mapping."""
+    st.header("📚 Act → Section Mapping")
 
-            result = extractor.extract(pdf_path)
+    if not mapping:
+        st.warning("No mapping found.")
+        return
 
-    # ======================================================
-    # EXTRACTION RESULT
-    # ======================================================
+    for item in mapping:
+        act = item.get("act", "Unknown Act")
+        sections = item.get("sections", [])
+
+        with st.expander(act, expanded=True):
+            if not sections:
+                st.caption("No associated sections.")
+                continue
+
+            columns = st.columns(4)
+
+            for index, section in enumerate(sections):
+                columns[index % 4].info(section)
+
+
+def render_download(result: dict, file_name: str) -> None:
+    """Render JSON download button and raw JSON preview."""
+    st.header("⬇️ Download JSON")
+
+    json_string = json.dumps(result, indent=4, ensure_ascii=False)
+
+    st.download_button(
+        label="Download JSON",
+        data=json_string,
+        file_name=f"{Path(file_name).stem}.json",
+        mime="application/json",
+    )
+
+    with st.expander("📦 Raw JSON", expanded=False):
+        st.json(result)
+
+
+def analyze_pdf(uploaded_file) -> dict:
+    """Run the extraction pipeline on the uploaded PDF."""
+    extractor = get_extractor()
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        pdf_path = save_uploaded_pdf(uploaded_file, temp_dir)
+        return extractor.extract(pdf_path)
+
+
+def main() -> None:
+    st.title(f"⚖️ {APP_TITLE}")
+    st.write(APP_DESCRIPTION)
+
+    uploaded_file = st.file_uploader(
+        label="Upload PDF",
+        type=["pdf"],
+    )
+
+    if uploaded_file is None:
+        st.info("Please upload a PDF file to begin analysis.")
+        return
+
+    st.success(f"Selected file: **{uploaded_file.name}**")
+
+    try:
+        with st.spinner("Analyzing document..."):
+            result = analyze_pdf(uploaded_file)
+
+    except Exception as error:
+        st.error("Something went wrong while analyzing the document.")
+        st.exception(error)
+        return
+
+    st.divider()
+    render_summary(result)
+
+    st.divider()
+    st.subheader("📌 Case Number")
+    st.info(result.get("case_number") or "Not available")
 
     st.divider()
 
-    st.header("📄 Extraction Result")
+    left_column, right_column = st.columns(2)
 
-    # ------------------------------------------------------
-    # Case Number
-    # ------------------------------------------------------
-
-    st.subheader("Case Number")
-
-    st.info(result.get("case_number", "Not Available"))
-
-    # ------------------------------------------------------
-    # Two Columns
-    # ------------------------------------------------------
-
-    col1, col2 = st.columns(2)
-
-    # ======================================================
-    # LEFT COLUMN
-    # ======================================================
-
-    with col1:
-
-        st.subheader("📍 Survey Numbers")
-
-        surveys = result.get("survey_numbers", [])
-
-        if surveys:
-
-            for survey in surveys:
-                st.write(f"• {survey}")
-
-        else:
-
-            st.caption("No Survey Numbers Found.")
+    with left_column:
+        render_items(
+            title="📍 Survey Numbers",
+            items=result.get("survey_numbers", []),
+            empty_message="No survey numbers found.",
+            style="success",
+        )
 
         st.divider()
 
-    # ======================================================
-    # RIGHT COLUMN
-    # ======================================================
+        render_items(
+            title="📜 Sections",
+            items=result.get("sections", []),
+            empty_message="No sections found.",
+            style="info",
+        )
 
-    with col2:
-
-        st.subheader("⚖️ Acts")
-
-        acts = result.get("acts", [])
-
-        if acts:
-
-            for act in acts:
-                st.write(f"• {act}")
-
-        else:
-
-            st.caption("No Acts Found.")
+    with right_column:
+        render_items(
+            title="⚖️ Acts",
+            items=result.get("acts", []),
+            empty_message="No acts found.",
+            style="success",
+        )
 
         st.divider()
 
-    # ======================================================
-    # ACT → SECTION MAPPING
-    # ======================================================
+        st.subheader("⭐ Primary Act")
+        primary_act = result.get("primary_act")
+
+        if primary_act:
+            st.success(primary_act)
+        else:
+            st.warning("None")
 
     st.divider()
+    render_act_section_mapping(result.get("act_section_mapping", []))
 
-    st.subheader("📚 Act → Section Mapping")
+    st.divider()
+    st.header("📄 PDF Preview")
 
-    mapping = result.get("act_section_mapping", [])
+    pdf_viewer(
+        input=uploaded_file.getvalue(),
+        width=900,
+        height=900,
+    )
 
-    if mapping:
+    st.divider()
+    render_download(result, uploaded_file.name)
 
-        for item in mapping:
 
-            with st.container(border=True):
-
-                st.markdown(f"### {item['act']}")
-
-                if item["sections"]:
-
-                    for section in item["sections"]:
-
-                        st.write(f"• {section}")
-
-                else:
-
-                    st.caption("No Associated Sections")
-
-    else:
-
-        st.caption("No Mapping Found.")
+if __name__ == "__main__":
+    main()

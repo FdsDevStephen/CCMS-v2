@@ -7,126 +7,140 @@ def build_act_extraction_prompt(
     document_text: str,
     sections: list[str],
 ) -> str:
-
     sections_text = "\n".join(sections)
 
     return f"""
 You are an expert Indian Legal Information Extraction Engine.
 
-Read the COMPLETE document before answering.
+Read the COMPLETE document carefully before answering.
 
-Your tasks are:
+Your job is ONLY to extract:
 
-1. Extract every Act explicitly mentioned in the document.
-2. Associate ONLY the provided Sections with the Act they explicitly belong to.
+1. Acts explicitly mentioned in the document.
+2. Mapping between those Acts and the already-extracted Sections provided below.
+
+Do NOT extract Constitutional provisions, Articles, Rules, Regulations, Notifications,
+Government Orders, Circulars, Ordinances, case numbers, survey numbers, dates, people,
+places, or any other legal references.
 
 =========================================================
-EXTRACTED SECTIONS
+ALREADY EXTRACTED SECTIONS
 =========================================================
 
-The following Sections have already been extracted.
+Use ONLY the Sections listed below.
 
-Use ONLY these Sections.
+Do not create, modify, guess, rewrite, expand, or infer any Section numbers.
 
 {sections_text}
 
 =========================================================
-ACT EXTRACTION
+WHAT TO EXTRACT
 =========================================================
 
-Extract every Act explicitly mentioned in the document.
+Extract only Acts.
 
-Rules:
+An Act is valid ONLY if its name explicitly contains the word "Act".
 
-- An Act is legislation whose name contains the word "Act".
-- Preserve the exact wording.
-- Include the year if present.
-- If no year is written, return only the Act name.
+Examples of valid Acts:
+
+- Karnataka Land Reforms Act, 1961
+- Karnataka Land Revenue Act, 1964
+- Transfer of Property Act, 1882
+
+Preserve the Act name exactly as written in the document.
+
+Rules for Acts:
+
+- Include the year if it is present.
+- If no year is present, return only the Act name.
 - Return each unique Act only once.
-- Preserve order of first appearance.
+- Preserve the order of first appearance.
+- Do not normalize, rename, shorten, or expand Act names.
 
 =========================================================
-ACT → SECTION MAPPING
+STRICT EXCLUSIONS
 =========================================================
 
-The Sections above are the ONLY Sections you may use.
+Never extract or map any of the following:
+
+- Constitution of India
+- Articles of the Constitution
+- Article 14
+- Article 19
+- Article 21
+- Article 226
+- Article 227
+- Constitutional provisions
+- Writ jurisdiction references
+- Rules
+- Regulations
+- Notifications
+- Government Orders
+- Circulars
+- Ordinances
+- Bye-laws
+- Case numbers
+- Survey numbers
+- Dates
+- Names of judges, advocates, parties, people, or places
+
+Important:
+
+- "Constitution of India" is NOT an Act.
+- "Article" is NOT a Section.
+- Do not include Article numbers in the output.
+- Do not map Articles to any Act.
+- Do not extract Rules even if they look similar to Sections.
+- Only map the provided Sections to Acts when the document explicitly says they belong to that Act.
+
+=========================================================
+ACT TO SECTION MAPPING RULES
+=========================================================
+
+The Sections listed above are the ONLY Sections you may use.
+
+A Section belongs to an Act ONLY when the document explicitly associates that Section
+with that Act.
+
+Valid explicit associations include:
+
+- Section 19 of the Karnataka Land Revenue Act, 1964.
+- Sections 79A, 79B and 80 of the Karnataka Land Reforms Act, 1961.
+- Section 136(2) under the Karnataka Land Revenue Act, 1964.
+- Section 4 read with Section 5 of the Transfer of Property Act, 1882.
+
+Invalid associations:
+
+- A Section appears in one paragraph and an Act appears elsewhere.
+- An Act appears nearby but is not grammatically linked to the Section.
+- The relationship is based on legal knowledge instead of document text.
+- The Section belongs to the Constitution, an Article, a Rule, or a Regulation.
+- The document merely discusses an Act and Section separately.
 
 Do NOT:
 
 - Create new Sections.
 - Modify Section numbers.
 - Guess missing Sections.
-- Infer legal relationships from your own knowledge.
+- Infer relationships from legal knowledge.
+- Map the same Section to multiple Acts unless the document explicitly does so.
+- Map a Section if the Act is unclear.
+- Include Sections that are not present in the provided extracted Sections list.
 
-A Section belongs to an Act ONLY if the document explicitly associates them.
+If an Act is mentioned but no provided Section is explicitly mapped to it,
+include the Act in "acts" but do not add unmapped Sections.
 
-Examples of explicit association:
-
-✓ Section 19 of the Karnataka Land Revenue Act, 1964.
-
-✓ Sections 19 and 20 under the Karnataka Land Revenue Act, 1964.
-
-✓ Section 136(2) read with the Karnataka Land Revenue Act, 1964.
-
-✓ Rule 108-D(3) of the Karnataka Land Revenue Rules, 1966.
-
-The following are NOT explicit associations:
-
-✗ Section 19 appears in one paragraph.
-
-✗ Karnataka Land Revenue Act appears somewhere else on the page.
-
-✗ The Act and Section appear in different contexts.
-
-Never associate a Section merely because an Act appears nearby.
-
-If multiple Acts are mentioned:
-
-- Determine independently which Sections belong to each Act.
-- A Section may belong to ONLY ONE Act.
-- Never duplicate the same Section under multiple Acts.
-
-If the document does NOT explicitly identify the Act for a Section:
-
-DO NOT map that Section.
-
-If an Act has no mapped Sections:
-
-Return an empty list for that Act.
+If no Act-to-Section mapping exists, return an empty list for "act_section_mapping".
 
 =========================================================
-GENERAL RULES
+OUTPUT RULES
 =========================================================
 
-- Read the COMPLETE document.
-- Preserve exact wording.
-- Preserve capitalization.
-- Preserve punctuation.
-- Remove duplicate Acts.
-- Remove duplicate Sections.
-- Preserve order of first appearance.
-- Return ONLY valid JSON.
-- Never explain your answer.
+Return ONLY valid JSON.
 
-Never extract:
+Do not include explanations, notes, markdown, comments, or extra text.
 
-- Constitution of India
-- Articles
-- Rules (unless they are already provided in the extracted Sections)
-- Regulations
-- Notifications
-- Government Orders
-- Circulars
-- Ordinances
-- Survey Numbers
-- Case Numbers
-- Dates
-- Persons
-- Places
-
-=========================================================
-OUTPUT FORMAT
-=========================================================
+The JSON must have exactly these keys:
 
 {{
     "acts": [],
@@ -138,23 +152,33 @@ OUTPUT FORMAT
     ]
 }}
 
+Rules for JSON:
+
+- "acts" must contain only Act names.
+- "act_section_mapping" must contain only Acts with explicitly mapped Sections.
+- Every mapped Act must also appear in "acts".
+- Every mapped Section must come from the provided Sections list.
+- Remove duplicate Acts.
+- Remove duplicate Sections within each Act.
+- Preserve order of first appearance.
+
 =========================================================
 EXAMPLES
 =========================================================
 
-Input
+Example 1
 
-Sections
+Sections:
 
 79A
 79B
 80
 
-Document
+Document:
 
 Sections 79A, 79B and 80 of the Karnataka Land Reforms Act, 1961.
 
-Output
+Output:
 
 {{
     "acts": [
@@ -174,50 +198,22 @@ Output
 
 ---------------------------------------------------------
 
-Input
+Example 2
 
-Sections
-
-136(2)
-108(K)
-
-Document
-
-Section 136(2) and Section 108(K) of the Karnataka Land Revenue Act, 1964.
-
-Output
-
-{{
-    "acts": [
-        "Karnataka Land Revenue Act, 1964"
-    ],
-    "act_section_mapping": [
-        {{
-            "act": "Karnataka Land Revenue Act, 1964",
-            "sections": [
-                "136(2)",
-                "108(K)"
-            ]
-        }}
-    ]
-}}
-
----------------------------------------------------------
-
-Input
-
-Sections
+Sections:
 
 19
 136(2)
 
-Document
+Document:
 
 Section 19 of the Karnataka Land Reforms Act, 1961.
 
 Section 136(2) of the Karnataka Land Revenue Act, 1964.
 
-Output
+The petition was filed under Articles 226 and 227 of the Constitution of India.
+
+Output:
 
 {{
     "acts": [
@@ -242,20 +238,40 @@ Output
 
 ---------------------------------------------------------
 
-Input
+Example 3
 
-Sections
+Sections:
+
+226
+227
+
+Document:
+
+The writ petition is filed under Articles 226 and 227 of the Constitution of India.
+
+Output:
+
+{{
+    "acts": [],
+    "act_section_mapping": []
+}}
+
+---------------------------------------------------------
+
+Example 4
+
+Sections:
 
 19
 136(2)
 
-Document
+Document:
 
 Section 19 was referred.
 
-The Karnataka Land Revenue Act, 1964 was also referred.
+The Karnataka Land Revenue Act, 1964 was also mentioned later in the judgment.
 
-Output
+Output:
 
 {{
     "acts": [
@@ -271,5 +287,6 @@ DOCUMENT
 {document_text}
 
 =========================================================
+
 Return ONLY valid JSON.
 """
