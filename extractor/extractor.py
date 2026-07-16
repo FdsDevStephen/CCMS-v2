@@ -14,7 +14,10 @@ from ocr import OCRProcessor
 from extractor.text_chunker import TextChunker
 from extractor.llm.factory import get_llm_client
 from extractor.parser import LLMResponseParser
-from extractor.prompts import build_act_extraction_prompt
+from extractor.prompts import (
+    build_act_extraction_prompt,
+    build_survey_location_prompt,
+)
 from extractor.regex_extractor import RegexExtractor
 from extractor.utils import get_case_number_from_filename
 from extractor.validator import Validator
@@ -76,6 +79,10 @@ class LegalExtractor:
             regex_result["sections"]
         )
 
+        regex_result["survey_locations"] = Normalizer.normalize_survey_locations(
+            regex_result.get("survey_locations", [])
+        )
+
         print("=" * 80)
         print("RAW SURVEY NUMBERS")
         print("=" * 80)
@@ -93,6 +100,7 @@ class LegalExtractor:
 
         all_acts = []
         all_mappings = []
+        all_survey_locations = []
 
         print(f"\nTotal Chunks : {len(chunks)}\n")
 
@@ -119,6 +127,16 @@ class LegalExtractor:
                 all_acts.extend(acts)
                 all_mappings.extend(mappings)
 
+                location_prompt = build_survey_location_prompt(
+                    chunk,
+                    regex_result["survey_numbers"],
+                )
+
+                location_response = self.llm.generate(location_prompt)
+                location_result = LLMResponseParser.parse(location_response)
+
+                all_survey_locations.extend(location_result.get("survey_locations", []))
+
             except Exception as e:
 
                 print(f"Chunk {index} Failed")
@@ -134,6 +152,9 @@ class LegalExtractor:
             "act_section_mapping": Normalizer.normalize_act_section_mapping(
                 all_mappings
             ),
+            "survey_locations": Normalizer.normalize_survey_locations(
+                all_survey_locations
+            ),
         }
 
         # ======================================================
@@ -143,11 +164,17 @@ class LegalExtractor:
         final_result = {
             "case_number": case_number,
             "survey_numbers": regex_result["survey_numbers"],
+            "survey_locations": regex_result["survey_locations"],
             "sections": regex_result["sections"],
             "acts": llm_result["acts"],
             "act_section_mapping": llm_result["act_section_mapping"],
             "primary_act": None,
         }
+        
+        print("=" * 80)
+        print("SURVEY LOCATIONS BEFORE VALIDATOR")
+        print("=" * 80)
+        print(regex_result.get("survey_locations"))
 
         final_result = Validator.validate(final_result)
 

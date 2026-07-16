@@ -1,154 +1,72 @@
-from pathlib import Path
+"""
+Test survey location extraction with pipeline-style chunking, using regex only.
+"""
+
+from __future__ import annotations
+
 import json
+from pathlib import Path
 
-from extractor.regex_extractor import RegexExtractor
-from extractor.text_chunker import TextChunker
-from extractor.prompts import build_act_extraction_prompt
-from extractor.llm.factory import get_llm_client
-from extractor.parser import LLMResponseParser
 from extractor.normalizer import Normalizer
+from extractor.survey_extractor import SurveyExtractor
+from extractor.survey_location_extractor import SurveyLocationExtractor
+from extractor.text_chunker import TextChunker
 
-# ==========================================================
-# INPUT TEXT FILE
-# ==========================================================
 
-TEXT_FILE = Path(
-    r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\output_text\WP-202220-2023-G.txt"
-)
+TEXT_FILE = Path(r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\output_text\WP-19110-2024-B.txt")
 
-text = TEXT_FILE.read_text(
-    encoding="utf-8",
-    errors="ignore",
-)
 
-# ==========================================================
-# STEP 1 - REGEX
-# ==========================================================
+def main() -> None:
+    text = TEXT_FILE.read_text(encoding="utf-8", errors="ignore")
 
-regex = RegexExtractor(text)
+    chunker = TextChunker(
+        chunk_size=3000,
+        overlap=300,
+    )
 
-sections = regex.extract_sections()
+    chunks = chunker.split(text)
 
-sections = Normalizer.normalize_sections(sections)
+    all_survey_numbers = []
+    all_survey_locations = []
 
-print("=" * 80)
-print("REGEX SECTIONS")
-print("=" * 80)
-
-for section in sections:
-    print(section)
-
-# ==========================================================
-# STEP 2 - CHUNKING
-# ==========================================================
-
-chunker = TextChunker(
-    chunk_size=3000,
-    overlap=300,
-)
-
-chunks = chunker.split(text)
-
-print("\n")
-print("=" * 80)
-print(f"TOTAL CHUNKS : {len(chunks)}")
-print("=" * 80)
-
-# ==========================================================
-# STEP 3 - LLM
-# ==========================================================
-
-llm = get_llm_client()
-
-all_acts = []
-
-all_mappings = []
-
-# ==========================================================
-# PROCESS CHUNKS
-# ==========================================================
-
-for index, chunk in enumerate(chunks, start=1):
-
-    print("\n")
     print("=" * 80)
-    print(f"CHUNK {index}")
+    print(f"Total chunks: {len(chunks)}")
     print("=" * 80)
 
-    prompt = build_act_extraction_prompt(
-        chunk,
-        sections,
+    for index, chunk in enumerate(chunks, start=1):
+        print(f"\nProcessing chunk {index}/{len(chunks)}")
+        print("-" * 80)
+
+        raw_survey_numbers = SurveyExtractor(chunk).extract()
+        survey_numbers = Normalizer.normalize_survey_numbers(raw_survey_numbers)
+
+        survey_locations = SurveyLocationExtractor(chunk).extract(survey_numbers)
+        survey_locations = Normalizer.normalize_survey_locations(survey_locations)
+
+        print("Survey numbers:")
+        print(json.dumps(survey_numbers, indent=4, ensure_ascii=False))
+
+        print("Survey locations:")
+        print(json.dumps(survey_locations, indent=4, ensure_ascii=False))
+
+        all_survey_numbers.extend(survey_numbers)
+        all_survey_locations.extend(survey_locations)
+
+    final_survey_numbers = Normalizer.normalize_survey_numbers(all_survey_numbers)
+    final_survey_locations = Normalizer.normalize_survey_locations(
+        all_survey_locations
     )
 
-    response = llm.generate(prompt)
+    print("\n" + "=" * 80)
+    print("FINAL SURVEY NUMBERS")
+    print("=" * 80)
+    print(json.dumps(final_survey_numbers, indent=4, ensure_ascii=False))
 
-    print("\nRAW RESPONSE\n")
+    print("\n" + "=" * 80)
+    print("FINAL SURVEY LOCATIONS")
+    print("=" * 80)
+    print(json.dumps(final_survey_locations, indent=4, ensure_ascii=False))
 
-    print(response)
 
-    result = LLMResponseParser.parse(response)
-
-    all_acts.extend(
-        result.get("acts", [])
-    )
-
-    all_mappings.extend(
-        result.get("act_section_mapping", [])
-    )
-
-# ==========================================================
-# STEP 4 - NORMALIZE
-# ==========================================================
-
-all_acts = Normalizer.normalize_acts(
-    all_acts
-)
-
-all_mappings = Normalizer.normalize_act_section_mapping(
-    all_mappings
-)
-
-# ==========================================================
-# FINAL RESULT
-# ==========================================================
-
-final_result = {
-    "acts": all_acts,
-    "act_section_mapping": all_mappings,
-}
-
-print("\n")
-print("=" * 80)
-print("FINAL RESULT")
-print("=" * 80)
-
-print(
-    json.dumps(
-        final_result,
-        indent=4,
-        ensure_ascii=False,
-    )
-)
-
-# ==========================================================
-# PRETTY PRINT
-# ==========================================================
-
-print("\n")
-print("=" * 80)
-print("ACT → SECTION MAPPING")
-print("=" * 80)
-
-for item in final_result["act_section_mapping"]:
-
-    print(f"\n📘 {item['act']}")
-
-    if item["sections"]:
-
-        for section in item["sections"]:
-
-            print(f"   • {section}")
-
-    else:
-
-        print("   No Sections")
+if __name__ == "__main__":
+    main()

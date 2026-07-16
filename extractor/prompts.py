@@ -290,3 +290,168 @@ DOCUMENT
 
 Return ONLY valid JSON.
 """
+
+def build_survey_location_prompt(
+    document_text: str,
+    survey_numbers: list[str],
+) -> str:
+    survey_numbers_text = "\n".join(survey_numbers)
+
+    return f"""
+You are an expert Indian legal document location extraction engine.
+
+Extract land location details connected to the given Survey Numbers.
+
+=========================================================
+SURVEY NUMBERS TO USE
+=========================================================
+
+{survey_numbers_text}
+
+Use ONLY these survey numbers.
+
+=========================================================
+TASK
+=========================================================
+
+For each Survey Number, find text where that survey number is mentioned as:
+
+- Sy. No.
+- S. No.
+- Survey No.
+- Re-Sy. No.
+- Re-Survey No.
+
+Then extract the land location details from the same sentence or nearby sentence.
+
+Extract these fields:
+
+- village
+- hobli
+- taluk
+- district
+
+=========================================================
+IMPORTANT RULES
+=========================================================
+
+If the document says:
+
+"land bearing Sy. No. 2 measuring 23 Acres 34 Guntas situated at Kenchammanahalli village of Anegodu Hobli of Davangere District"
+
+Then you MUST extract:
+
+- survey_number: "2"
+- village: "Kenchammanahalli"
+- hobli: "Anegodu"
+- taluk: null
+- district: "Davangere"
+
+If the document says:
+
+"Re-Survey No. 2 of Kenchammanahalli village in Anegod Hobli, Davangere Taluka"
+
+Then you MUST extract:
+
+- survey_number: "2"
+- village: "Kenchammanahalli"
+- hobli: "Anegod"
+- taluk: "Davangere"
+- district: null
+
+Do not return an empty list when location words are clearly present.
+
+=========================================================
+FIELD RULES
+=========================================================
+
+Village:
+
+Extract the name before the word "village".
+
+Examples:
+
+- Kenchammanahalli village -> Kenchammanahalli
+- of Kenchammanahalli village -> Kenchammanahalli
+
+Hobli:
+
+Extract the name before the word "Hobli".
+
+Examples:
+
+- Anegodu Hobli -> Anegodu
+- in Anegod Hobli -> Anegod
+
+Taluk:
+
+Extract the name before "Taluk" or "Taluka".
+
+Examples:
+
+- Davangere Taluka -> Davangere
+- Davangere Taluk -> Davangere
+
+District:
+
+Extract the name before the word "District".
+
+Examples:
+
+- Davangere District -> Davangere
+
+=========================================================
+DO NOT EXTRACT
+=========================================================
+
+Do not extract:
+
+- case numbers
+- O.S. numbers
+- W.P. numbers
+- R.A. numbers
+- years
+- acres
+- guntas
+- party addresses
+- court locations
+- advocate addresses
+- act names
+- sections
+
+=========================================================
+OUTPUT RULES
+=========================================================
+
+Return ONLY valid JSON.
+
+Do not include markdown.
+Do not explain.
+Do not add extra keys.
+
+Use null for missing values.
+
+Output format:
+
+{{
+    "survey_locations": [
+        {{
+            "survey_number": "",
+            "village": null,
+            "hobli": null,
+            "taluk": null,
+            "district": null
+        }}
+    ]
+}}
+
+=========================================================
+DOCUMENT
+=========================================================
+
+{document_text}
+
+=========================================================
+
+Return ONLY valid JSON.
+"""

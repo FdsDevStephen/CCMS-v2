@@ -5,6 +5,7 @@ Streamlit app for AI-powered legal document analysis.
 from pathlib import Path
 import json
 import tempfile
+from unittest import result
 
 import streamlit as st
 from streamlit_pdf_viewer import pdf_viewer
@@ -60,12 +61,12 @@ def render_summary(result: dict) -> None:
     """Render extraction summary metrics."""
     st.header("📄 Extraction Summary")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     col1.metric("Survey Numbers", len(result.get("survey_numbers", [])))
-    col2.metric("Sections", len(result.get("sections", [])))
-    col3.metric("Acts", len(result.get("acts", [])))
-    # col4.metric("Primary Act", "Yes" if result.get("primary_act") else "No")
+    col2.metric("Survey Locations", len(result.get("survey_locations", [])))
+    col3.metric("Sections", len(result.get("sections", [])))
+    col4.metric("Acts", len(result.get("acts", [])))
 
 
 def render_act_section_mapping(mapping: list) -> None:
@@ -107,6 +108,26 @@ def render_download(result: dict, file_name: str) -> None:
     with st.expander("📦 Raw JSON", expanded=False):
         st.json(result)
 
+def render_survey_locations(locations: list[dict]) -> None:
+    """Render Survey Number -> Location details."""
+    st.header("📍 Survey Locations")
+
+    if not locations:
+        st.warning("No survey locations found.")
+        return
+
+    st.dataframe(
+        locations,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "survey_number": "Survey Number",
+            "village": "Village",
+            "hobli": "Hobli",
+            "taluk": "Taluk",
+            "district": "District",
+        },
+    )
 
 def analyze_pdf(uploaded_file) -> dict:
     """Run the extraction pipeline on the uploaded PDF."""
@@ -186,6 +207,9 @@ def main() -> None:
         #     st.success(primary_act)
         # else:
         #     st.warning("None")
+        
+    st.divider()
+    render_survey_locations(result.get("survey_locations", []))
 
     st.divider()
     render_act_section_mapping(result.get("act_section_mapping", []))

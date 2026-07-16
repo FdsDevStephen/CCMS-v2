@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest import result
 
 from extractor.normalizer import Normalizer
 
@@ -14,6 +13,7 @@ class Validator:
     REQUIRED_KEYS = {
         "case_number": None,
         "survey_numbers": [],
+        "survey_locations": [],
         "acts": [],
         "sections": [],
         "act_section_mapping": [],
@@ -33,12 +33,14 @@ class Validator:
         """
 
         result = cls.REQUIRED_KEYS.copy()
-
         result.update(data)
 
         # Ensure correct types
         if not isinstance(result["survey_numbers"], list):
             result["survey_numbers"] = []
+
+        if not isinstance(result["survey_locations"], list):
+            result["survey_locations"] = []
 
         if not isinstance(result["acts"], list):
             result["acts"] = []
@@ -50,10 +52,16 @@ class Validator:
             result["act_section_mapping"] = []
 
         # Normalize values
-        result["case_number"] = Normalizer.normalize_case_number(result["case_number"])
+        result["case_number"] = Normalizer.normalize_case_number(
+            result["case_number"]
+        )
 
         result["survey_numbers"] = Normalizer.normalize_survey_numbers(
             result["survey_numbers"]
+        )
+
+        result["survey_locations"] = Normalizer.normalize_survey_locations(
+            result["survey_locations"]
         )
 
         result["sections"] = Normalizer.normalize_sections(result["sections"])
@@ -66,7 +74,6 @@ class Validator:
 
         # Validate primary_act
         if result["primary_act"]:
-
             result["primary_act"] = " ".join(result["primary_act"].split())
 
             if result["primary_act"] not in result["acts"]:

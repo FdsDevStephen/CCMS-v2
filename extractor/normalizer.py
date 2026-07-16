@@ -9,6 +9,10 @@ from typing import Any
 
 from extractor.act_normalizer import ActNormalizer
 
+from extractor.prompts import (
+    build_act_extraction_prompt,
+    build_survey_location_prompt,
+)
 
 ACT_NORMALIZER = ActNormalizer()
 
@@ -180,6 +184,36 @@ class Normalizer:
         section = normalize_parentheses(section)
 
         return finalize_section_text(section)
+    
+    @staticmethod
+    def normalize_survey_locations(locations: list[dict]) -> list[dict]:
+        """Normalize and deduplicate Survey Number -> Location mappings."""
+        normalized = []
+        seen = set()
+
+        for item in locations:
+            survey_number = normalize_survey_text(
+                str(item.get("survey_number", ""))
+            ).strip()
+
+            if not survey_number:
+                continue
+
+            location = {
+                "survey_number": survey_number,
+                "village": clean_location_name(item.get("village")),
+                "hobli": clean_location_name(item.get("hobli")),
+                "taluk": clean_location_name(item.get("taluk")),
+                "district": clean_location_name(item.get("district")),
+            }
+
+            if survey_number in seen:
+                continue
+
+            seen.add(survey_number)
+            normalized.append(location)
+
+        return normalized
 
 
 def clean_spaces(value: str) -> str:
@@ -400,3 +434,22 @@ def is_valid_mapping_section(section: str) -> bool:
         return False
 
     return bool(VALID_SECTION_PATTERN.fullmatch(section))
+
+def clean_location_name(value: str | None) -> str | None:
+    """Clean village, hobli, taluk, or district names."""
+    if not value:
+        return None
+
+    value = clean_spaces(str(value))
+    value = value.strip(" ,.;:-")
+
+    # OCR/list junk cleanup:
+    # "t Hejamadi" -> "Hejamadi"
+    # "t Lingammanahalli" -> "Lingammanahalli"
+    value = re.sub(
+        r"^[a-z]\s+(?=[A-Z])",
+        "",
+        value,
+    )
+
+    return value or None
