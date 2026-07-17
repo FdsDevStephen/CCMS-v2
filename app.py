@@ -14,10 +14,6 @@ from extractor.extractor import LegalExtractor
 
 
 APP_TITLE = "AI-Powered Legal Document Analysis"
-APP_DESCRIPTION = (
-    "Upload a Karnataka High Court judgment PDF to extract structured legal information."
-)
-
 
 st.set_page_config(
     page_title=APP_TITLE,
@@ -140,7 +136,6 @@ def analyze_pdf(uploaded_file) -> dict:
 
 def main() -> None:
     st.title(f"⚖️ {APP_TITLE}")
-    st.write(APP_DESCRIPTION)
 
     uploaded_file = st.file_uploader(
         label="Upload PDF",
