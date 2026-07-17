@@ -21,6 +21,8 @@ from extractor.prompts import (
 from extractor.regex_extractor import RegexExtractor
 from extractor.utils import get_case_number_from_filename
 from extractor.validator import Validator
+from extractor.normalizer import Normalizer
+from extractor.survey_location import SurveyLocationExtractor
 
 
 class LegalExtractor:
@@ -49,15 +51,7 @@ class LegalExtractor:
 
         pdf_path = Path(pdf_path)
 
-        # ======================================================
-        # OCR
-        # ======================================================
-
         text, _ = self.ocr.process(pdf_path)
-
-        # ======================================================
-        # Case Number
-        # ======================================================
 
         case_number = get_case_number_from_filename(pdf_path)
 
@@ -79,8 +73,18 @@ class LegalExtractor:
             regex_result["sections"]
         )
 
+        # -------------------------------------------------
+        # Use the SAME SurveyLocationExtractor as testor.py
+        # -------------------------------------------------
+
+        location_extractor = SurveyLocationExtractor(text)
+
+        regex_result["survey_locations"] = location_extractor.extract(
+            regex_result["survey_numbers"]
+        )
+
         regex_result["survey_locations"] = Normalizer.normalize_survey_locations(
-            regex_result.get("survey_locations", [])
+            regex_result["survey_locations"]
         )
 
         print("=" * 80)
@@ -170,7 +174,7 @@ class LegalExtractor:
             "act_section_mapping": llm_result["act_section_mapping"],
             "primary_act": None,
         }
-        
+
         print("=" * 80)
         print("SURVEY LOCATIONS BEFORE VALIDATOR")
         print("=" * 80)

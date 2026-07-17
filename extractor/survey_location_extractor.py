@@ -1,12 +1,10 @@
-"""
-Survey location extractor.
-"""
-
 from __future__ import annotations
 
 import re
-
+import json
 from extractor.normalizer import Normalizer
+from extractor.llm.factory import get_llm_client
+from extractor.location_prompt import build_location_prompt
 
 
 class SurveyLocationExtractor:
@@ -27,63 +25,28 @@ class SurveyLocationExtractor:
         re.IGNORECASE | re.VERBOSE,
     )
 
-    NAME_TOKEN = (
-        r"(?!village\b|hobli\b|taluk\b|taluka\b|district\b|"
-        r"of\b|in\b|at\b|and\b|the\b)"
-        r"[A-Za-z][A-Za-z.'-]*"
-    )
-
-    VILLAGE_PATTERN = re.compile(
-        rf"""
-        (?P<village>{NAME_TOKEN}(?:\s+{NAME_TOKEN}){{0,3}})
-        \s+
-        village
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
-
-    HOBLI_PATTERN = re.compile(
-        rf"""
-        (?:of|in|at|,)
-        \s+
-        (?P<hobli>{NAME_TOKEN}(?:\s+{NAME_TOKEN}){{0,3}})
-        \s+
-        Hobli
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
-
-    TALUK_PATTERN = re.compile(
-        rf"""
-        (?:of|in|at|,)
-        \s+
-        (?P<taluk>{NAME_TOKEN}(?:\s+{NAME_TOKEN}){{0,3}})
-        \s+
-        Taluk(?:a)?
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
-
-    DISTRICT_PATTERN = re.compile(
-        rf"""
-        (?:of|in|at|,)
-        \s+
-        (?P<district>{NAME_TOKEN}(?:\s+{NAME_TOKEN}){{0,3}})
-        \s+
-        District
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
+    CONTEXT_BEFORE = 5
+    CONTEXT_AFTER = 250
 
     def __init__(self, text: str):
         self.text = text
+        self.client = get_llm_client()
 
-    def extract(self, survey_numbers: list[str]) -> list[dict]:
-        results = []
+    def extract(self, survey_numbers: list[str]):
+        contexts = self._build_contexts(survey_numbers)
+
+        if not contexts:
+            return []
+
+        return self._extract_locations(contexts)
+
+    def _build_contexts(self, survey_numbers: list[str]) -> list[dict]:
+        contexts = []
         seen = set()
 
         for match in self.SURVEY_PATTERN.finditer(self.text):
             raw_survey = match.group("survey_number")
+
             normalized = Normalizer.normalize_survey_numbers([raw_survey])
 
             if not normalized:
@@ -94,65 +57,88 @@ class SurveyLocationExtractor:
             if survey_number not in survey_numbers:
                 continue
 
-            start = max(0, match.start() - 150)
-            end = min(len(self.text), match.end() + 900)
-
-            context = self._clean_spaces(self.text[start:end])
-            location = self._extract_location(context)
-
-            if not any(location.values()):
-                continue
-
             if survey_number in seen:
                 continue
 
             seen.add(survey_number)
 
-            results.append(
+            start = max(0, match.start() - self.CONTEXT_BEFORE)
+            end = min(len(self.text), match.end() + self.CONTEXT_AFTER)
+
+            context = " ".join(self.text[start:end].split())
+
+            contexts.append(
                 {
                     "survey_number": survey_number,
-                    **location,
+                    "context": context,
                 }
             )
 
+        return contexts
+
+
+
+    def _extract_locations(self, contexts: list[dict]) -> list[dict]:
+        results = []
+
+        for context in contexts:
+            prompt = build_location_prompt([context])
+
+            response = self.client.generate(prompt)
+
+            try:
+                result = json.loads(response)
+
+                if isinstance(result, list):
+                    results.extend(result)
+                else:
+                    results.append(result)
+
+            except Exception:
+                print(response)
+
+        # -------------------------------------------------
+        # Find the record with the most information
+        # -------------------------------------------------
+        best_location = None
+        best_score = -1
+
+        for location in results:
+            score = sum(
+                field is not None
+                for field in (
+                    location.get("village"),
+                    location.get("hobli"),
+                    location.get("taluk"),
+                    location.get("district"),
+                )
+            )
+
+            if score > best_score:
+                best_score = score
+                best_location = location
+
+        # -------------------------------------------------
+        # Fill missing fields from the best record
+        # -------------------------------------------------
+        if best_location:
+            for location in results:
+
+                if location is best_location:
+                    continue
+
+                if location.get("village") is None:
+                    location["village"] = best_location.get("village")
+
+                if location.get("hobli") is None:
+                    location["hobli"] = best_location.get("hobli")
+
+                if location.get("taluk") is None:
+                    location["taluk"] = best_location.get("taluk")
+
+                if location.get("district") is None:
+                    location["district"] = best_location.get("district")
+
         return results
 
-    def _extract_location(self, context: str) -> dict:
-        return {
-            "village": self._find_group(self.VILLAGE_PATTERN, context, "village"),
-            "hobli": self._find_group(self.HOBLI_PATTERN, context, "hobli"),
-            "taluk": self._find_group(self.TALUK_PATTERN, context, "taluk"),
-            "district": self._find_group(self.DISTRICT_PATTERN, context, "district"),
-        }
-
-    @staticmethod
-    def _find_group(pattern: re.Pattern, text: str, group_name: str) -> str | None:
-        matches = list(pattern.finditer(text))
-
-        if not matches:
-            return None
-
-        return SurveyLocationExtractor._clean_name(matches[-1].group(group_name))
-
-    @staticmethod
-    def _clean_name(value: str | None) -> str | None:
-        if not value:
-            return None
-
-        value = SurveyLocationExtractor._clean_spaces(value)
-        value = value.strip(" ,.;:-")
-
-        # OCR/list junk cleanup:
-        # "t Hejamadi" -> "Hejamadi"
-        # "t Lingammanahalli" -> "Lingammanahalli"
-        value = re.sub(
-            r"^[a-z]\s+(?=[A-Z])",
-            "",
-            value,
-        )
-
-        return value or None
-
-    @staticmethod
-    def _clean_spaces(value: str) -> str:
-        return " ".join(value.split())
+        

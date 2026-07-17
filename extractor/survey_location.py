@@ -26,7 +26,7 @@ class SurveyLocationExtractor:
     )
 
     CONTEXT_BEFORE = 5
-    CONTEXT_AFTER = 500
+    CONTEXT_AFTER = 250
 
     def __init__(self, text: str):
         self.text = text
@@ -40,36 +40,45 @@ class SurveyLocationExtractor:
 
         return self._extract_locations(contexts)
 
-    def _build_contexts(self, survey_numbers: list[str]) -> list[dict]:
+    def _build_contexts(self, survey_numbers: list[str]):
+
         contexts = []
-        seen = set()
 
-        for match in self.SURVEY_PATTERN.finditer(self.text):
-            raw_survey = match.group("survey_number")
+        matches = list(self.SURVEY_PATTERN.finditer(self.text))
 
-            normalized = Normalizer.normalize_survey_numbers([raw_survey])
+        for i, match in enumerate(matches):
 
-            if not normalized:
+            # -----------------------------
+            # Current survey
+            # -----------------------------
+            current_survey = Normalizer.normalize_survey_numbers([match.group(1)])[0]
+
+            if current_survey not in survey_numbers:
                 continue
 
-            survey_number = normalized[0]
+            # -----------------------------
+            # Context Start
+            # -----------------------------
+            start = match.start()
 
-            if survey_number not in survey_numbers:
-                continue
+            # -----------------------------
+            # Context End
+            # -----------------------------
+            # -----------------------------
+            # Context End
+            # -----------------------------
+            MAX_CONTEXT = 300
 
-            if survey_number in seen:
-                continue
+            if i + 1 < len(matches):
+                end = min(matches[i + 1].start(), start + MAX_CONTEXT)
+            else:
+                end = min(len(self.text), start + MAX_CONTEXT)
 
-            seen.add(survey_number)
-
-            start = max(0, match.start() - self.CONTEXT_BEFORE)
-            end = min(len(self.text), match.end() + self.CONTEXT_AFTER)
-
-            context = " ".join(self.text[start:end].split())
+            context = self.text[start:end]
 
             contexts.append(
                 {
-                    "survey_number": survey_number,
+                    "survey_number": current_survey,
                     "context": context,
                 }
             )
@@ -82,6 +91,7 @@ class SurveyLocationExtractor:
         results = []
 
         for context in contexts:
+            
             prompt = build_location_prompt([context])
 
             response = self.client.generate(prompt)
@@ -140,5 +150,3 @@ class SurveyLocationExtractor:
                     location["district"] = best_location.get("district")
 
         return results
-
-        

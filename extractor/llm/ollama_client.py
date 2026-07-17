@@ -66,6 +66,7 @@ class OllamaClient(BaseLLMClient):
                     ],
                     options={
                         "temperature": 0,
+                        "top_p": 1,
                     },
                     format="json",
                 )
