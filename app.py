@@ -169,14 +169,30 @@ def main() -> None:
     left_column, right_column = st.columns(2)
 
     with left_column:
-        render_items(
-            title="📍 Survey Numbers",
-            items=result.get("survey_numbers", []),
-            empty_message="No survey numbers found.",
-            style="success",
-        )
+        st.header("📍 Survey Details")
 
-        st.divider()
+        survey_locations = result.get("survey_locations", [])
+
+        if survey_locations:
+            st.dataframe(
+                survey_locations,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "survey_number": "Survey Number",
+                    "village": "Village",
+                    "hobli": "Hobli",
+                    "taluk": "Taluk",
+                    "district": "District",
+                },
+            )
+        else:
+            render_items(
+                title="📍 Survey Numbers",
+                items=result.get("survey_numbers", []),
+                empty_message="No survey numbers found.",
+                style="success",
+            )
 
         # render_items(
         #     title="📜 Sections",
