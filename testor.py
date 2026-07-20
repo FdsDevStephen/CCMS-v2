@@ -8,7 +8,7 @@ from extractor.normalizer import Normalizer
 def main():
 
     text = Path(
-        r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\output_text\WP-15813-2021-B.txt"
+        r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\output_text\WP-13437-2022-B.txt"
     ).read_text(
         encoding="utf-8",
         errors="ignore",

@@ -46,7 +46,13 @@ class SurveyLocationExtractor:
 
         matches = list(self.SURVEY_PATTERN.finditer(self.text))
 
+        MAX_CONTEXTS = 10
+
         for i, match in enumerate(matches):
+
+            # Stop after collecting 10 contexts
+            if len(contexts) >= MAX_CONTEXTS:
+                break
 
             # -----------------------------
             # Current survey
@@ -61,12 +67,6 @@ class SurveyLocationExtractor:
             # -----------------------------
             start = match.start()
 
-            # -----------------------------
-            # Context End
-            # -----------------------------
-            # -----------------------------
-            # Context End
-            # -----------------------------
             MAX_CONTEXT = 300
 
             if i + 1 < len(matches):
@@ -90,13 +90,17 @@ class SurveyLocationExtractor:
     def _extract_locations(self, contexts: list[dict]) -> list[dict]:
         results = []
 
+        # Process one context at a time
         for context in contexts:
-            
             prompt = build_location_prompt([context])
 
             response = self.client.generate(prompt)
 
             try:
+                print("=" * 80)
+                print(response)
+                print("=" * 80)
+
                 result = json.loads(response)
 
                 if isinstance(result, list):
@@ -105,48 +109,56 @@ class SurveyLocationExtractor:
                     results.append(result)
 
             except Exception:
-                print(response)
+                print(f"Failed to parse response:\n{response}")
 
-        # -------------------------------------------------
-        # Find the record with the most information
-        # -------------------------------------------------
+        # ------------------------------------------------------------------
+        # STEP 1: Merge all occurrences of the same survey number
+        # ------------------------------------------------------------------
+        merged = {}
+
+        for location in results:
+            survey = location["survey_number"]
+
+            if survey not in merged:
+                merged[survey] = location.copy()
+            else:
+                existing = merged[survey]
+
+                for field in ("village", "hobli", "taluk", "district"):
+                    if existing.get(field) is None and location.get(field) is not None:
+                        existing[field] = location[field]
+
+        results = list(merged.values())
+
+        # ------------------------------------------------------------------
+        # STEP 2: Find the most complete location
+        # ------------------------------------------------------------------
         best_location = None
         best_score = -1
 
         for location in results:
             score = sum(
-                field is not None
-                for field in (
-                    location.get("village"),
-                    location.get("hobli"),
-                    location.get("taluk"),
-                    location.get("district"),
-                )
+                location.get(field) is not None
+                for field in ("village", "hobli", "taluk", "district")
             )
 
             if score > best_score:
                 best_score = score
                 best_location = location
 
-        # -------------------------------------------------
-        # Fill missing fields from the best record
-        # -------------------------------------------------
+        # ------------------------------------------------------------------
+        # STEP 3: Copy best location to surveys with NO location information
+        # ------------------------------------------------------------------
         if best_location:
             for location in results:
 
-                if location is best_location:
-                    continue
+                score = sum(
+                    location.get(field) is not None
+                    for field in ("village", "hobli", "taluk", "district")
+                )
 
-                if location.get("village") is None:
-                    location["village"] = best_location.get("village")
-
-                if location.get("hobli") is None:
-                    location["hobli"] = best_location.get("hobli")
-
-                if location.get("taluk") is None:
-                    location["taluk"] = best_location.get("taluk")
-
-                if location.get("district") is None:
-                    location["district"] = best_location.get("district")
+                if score == 0:
+                    for field in ("village", "hobli", "taluk", "district"):
+                        location[field] = best_location.get(field)
 
         return results

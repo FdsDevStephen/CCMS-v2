@@ -81,6 +81,7 @@ class SurveyLocationExtractor:
     def _extract_locations(self, contexts: list[dict]) -> list[dict]:
         results = []
 
+        # Process one context at a time
         for context in contexts:
             prompt = build_location_prompt([context])
 
@@ -95,50 +96,23 @@ class SurveyLocationExtractor:
                     results.append(result)
 
             except Exception:
-                print(response)
+                print(f"Failed to parse response:\n{response}")
 
-        # -------------------------------------------------
-        # Find the record with the most information
-        # -------------------------------------------------
-        best_location = None
-        best_score = -1
+        # Merge results for the same survey number
+        merged = {}
 
         for location in results:
-            score = sum(
-                field is not None
-                for field in (
-                    location.get("village"),
-                    location.get("hobli"),
-                    location.get("taluk"),
-                    location.get("district"),
-                )
-            )
+            survey_number = location.get("survey_number")
 
-            if score > best_score:
-                best_score = score
-                best_location = location
+            if survey_number not in merged:
+                merged[survey_number] = location
+            else:
+                existing = merged[survey_number]
 
-        # -------------------------------------------------
-        # Fill missing fields from the best record
-        # -------------------------------------------------
-        if best_location:
-            for location in results:
+                for field in ("village", "hobli", "taluk", "district"):
+                    if existing.get(field) is None and location.get(field) is not None:
+                        existing[field] = location[field]
 
-                if location is best_location:
-                    continue
-
-                if location.get("village") is None:
-                    location["village"] = best_location.get("village")
-
-                if location.get("hobli") is None:
-                    location["hobli"] = best_location.get("hobli")
-
-                if location.get("taluk") is None:
-                    location["taluk"] = best_location.get("taluk")
-
-                if location.get("district") is None:
-                    location["district"] = best_location.get("district")
-
-        return results
+        return list(merged.values())
 
         
