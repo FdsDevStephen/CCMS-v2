@@ -73,9 +73,6 @@ class LegalExtractor:
 
         case_number = get_case_number_from_filename(pdf_path)
 
-        # ======================================================
-        # Regex Extraction
-        # ======================================================
 
         regex = RegexExtractor(text)
 
@@ -100,20 +97,12 @@ class LegalExtractor:
         for survey in regex_result["survey_numbers"]:
             print(repr(survey))
 
-        # ======================================================
-        # Chunk OCR Text
-        # ======================================================
-
         chunks = self.chunker.split(text)
 
         all_acts = []
         all_mappings = []
 
         print(f"\nTotal Chunks : {len(chunks)}\n")
-
-        # ======================================================
-        # LLM Extraction (Acts Only)
-        # ======================================================
 
         MAX_WORKERS = 4
 
@@ -147,9 +136,7 @@ class LegalExtractor:
 
                     print(e)
 
-        # ======================================================
-        # Merge LLM Result
-        # ======================================================
+
 
         llm_result = {
             "acts": Normalizer.normalize_acts(all_acts),
@@ -158,9 +145,6 @@ class LegalExtractor:
             ),
         }
 
-        # ======================================================
-        # Final Output
-        # ======================================================
 
         final_result = {
             "case_number": case_number,

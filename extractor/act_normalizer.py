@@ -1,8 +1,3 @@
-"""
-Act Normalizer
-
-Normalizes extracted Act names using acts.json.
-"""
 
 from __future__ import annotations
 
@@ -29,9 +24,7 @@ class ActNormalizer:
 
             self.acts = json.load(f)
 
-    # ======================================================
     # Normalize
-    # ======================================================
 
     def normalize(
         self,
@@ -44,19 +37,17 @@ class ActNormalizer:
 
         act = " ".join(act.split())
 
-        # ==================================================
+
         # Exact Canonical Match
-        # ==================================================
+
 
         for item in self.acts:
 
             if act.lower() == item["name"].lower():
 
                 return item["name"]
-
-        # ==================================================
+            
         # Exact Alias Match
-        # ==================================================
 
         for item in self.acts:
 
@@ -66,10 +57,7 @@ class ActNormalizer:
 
                     return item["name"]
 
-        # ==================================================
         # Fuzzy Canonical Match
-        # ==================================================
-
         best_name = act
         best_score = 0
 
@@ -85,9 +73,8 @@ class ActNormalizer:
                 best_score = score
                 best_name = item["name"]
 
-        # ==================================================
         # Fuzzy Alias Match
-        # ==================================================
+
 
         for item in self.acts:
 
@@ -103,9 +90,7 @@ class ActNormalizer:
                     best_score = score
                     best_name = item["name"]
 
-        # ==================================================
         # Return Best Match
-        # ==================================================
 
         if best_score >= threshold:
 

@@ -125,9 +125,6 @@ class SurveyLocationExtractor:
             except Exception:
                 print(f"Failed to parse response:\n{response}")
 
-        # ------------------------------------------------------------------
-        # STEP 1: Merge all occurrences of the same survey number
-        # ------------------------------------------------------------------
         merged = {}
 
         for location in results:
@@ -144,9 +141,6 @@ class SurveyLocationExtractor:
 
         results = list(merged.values())
 
-        # ------------------------------------------------------------------
-        # STEP 2: Find the most complete location
-        # ------------------------------------------------------------------
         best_location = None
         best_score = -1
 
@@ -160,9 +154,6 @@ class SurveyLocationExtractor:
                 best_score = score
                 best_location = location
 
-        # ------------------------------------------------------------------
-        # STEP 3: Copy best location to surveys with NO location information
-        # ------------------------------------------------------------------
         if best_location:
             for location in results:
 

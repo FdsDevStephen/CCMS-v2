@@ -14,9 +14,6 @@ class LocationResponseParser:
     @staticmethod
     def parse(response: str) -> dict[str, Any]:
 
-        # -----------------------
-        # Direct JSON
-        # -----------------------
 
         try:
 
@@ -31,10 +28,6 @@ class LocationResponseParser:
 
         except json.JSONDecodeError:
             pass
-
-        # -----------------------
-        # Extract JSON
-        # -----------------------
 
         match = re.search(
             r"\{.*\}",
@@ -57,10 +50,6 @@ class LocationResponseParser:
 
             except json.JSONDecodeError:
                 pass
-
-        # -----------------------
-        # Remove Markdown
-        # -----------------------
 
         cleaned = (
             response

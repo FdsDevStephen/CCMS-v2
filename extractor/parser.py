@@ -20,10 +20,6 @@ class LLMResponseParser:
         Parse the LLM response into a Python dictionary.
         """
 
-        # -------------------------------
-        # Try direct JSON
-        # -------------------------------
-
         try:
             data = json.loads(response)
 
@@ -37,9 +33,6 @@ class LLMResponseParser:
         except json.JSONDecodeError:
             pass
 
-        # -------------------------------
-        # Extract JSON object
-        # -------------------------------
 
         match = re.search(r"\{.*\}", response, re.DOTALL)
 
@@ -58,10 +51,6 @@ class LLMResponseParser:
 
             except json.JSONDecodeError:
                 pass
-
-        # -------------------------------
-        # Remove Markdown
-        # -------------------------------
 
         cleaned = response.replace("```json", "").replace("```", "").strip()
 
