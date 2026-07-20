@@ -6,6 +6,7 @@ from extractor.normalizer import Normalizer
 from extractor.llm.factory import get_llm_client
 from extractor.location_prompt import build_location_prompt
 
+
 class SurveyLocationExtractor:
     SURVEY_PATTERN = re.compile(
         r"""
@@ -32,7 +33,20 @@ class SurveyLocationExtractor:
         self.client = get_llm_client()
 
     def extract(self, survey_numbers: list[str]):
+        print(">>> SURVEY LOCATION EXTRACTOR VERSION 2 <<<")
         contexts = self._build_contexts(survey_numbers)
+
+        print("\n" + "=" * 100)
+        print("SURVEY CONTEXTS")
+        print("=" * 100)
+
+        for i, context in enumerate(contexts, start=1):
+            print(f"\nContext {i}")
+            print("-" * 100)
+            print(f"Survey Number : {context['survey_number']}")
+            print("-" * 100)
+            print(context["context"])
+            print("-" * 100)
 
         if not contexts:
             return []
@@ -81,7 +95,7 @@ class SurveyLocationExtractor:
                     "context": context,
                 }
             )
-
+        print(f"Built {len(contexts)} contexts")
         return contexts
 
 
@@ -101,6 +115,7 @@ class SurveyLocationExtractor:
                 print("=" * 80)
 
                 result = json.loads(response)
+                results = self._fill_missing_locations(results)
 
                 if isinstance(result, list):
                     results.extend(result)
@@ -161,3 +176,28 @@ class SurveyLocationExtractor:
                         location[field] = best_location.get(field)
 
         return results
+    
+    
+    def _fill_missing_locations(self, locations: list[dict]) -> list[dict]:
+        """
+        Fill missing location fields using the most complete record.
+        """
+
+        if not locations:
+            return locations
+
+        # Find the most complete location
+        best = max(
+            locations,
+            key=lambda x: sum(
+                x.get(field) is not None
+                for field in ("village", "hobli", "taluk", "district")
+            ),
+        )
+
+        for location in locations:
+            for field in ("village", "hobli", "taluk", "district"):
+                if location.get(field) is None:
+                    location[field] = best.get(field)
+
+        return locations

@@ -115,6 +115,7 @@ class SurveyLocationExtractor:
                 print("=" * 80)
 
                 result = json.loads(response)
+                results = self._fill_missing_locations(results)
 
                 if isinstance(result, list):
                     results.extend(result)
@@ -175,3 +176,28 @@ class SurveyLocationExtractor:
                         location[field] = best_location.get(field)
 
         return results
+    
+    
+    def _fill_missing_locations(self, locations: list[dict]) -> list[dict]:
+        """
+        Fill missing location fields using the most complete record.
+        """
+
+        if not locations:
+            return locations
+
+        # Find the most complete location
+        best = max(
+            locations,
+            key=lambda x: sum(
+                x.get(field) is not None
+                for field in ("village", "hobli", "taluk", "district")
+            ),
+        )
+
+        for location in locations:
+            for field in ("village", "hobli", "taluk", "district"):
+                if location.get(field) is None:
+                    location[field] = best.get(field)
+
+        return locations
