@@ -6,7 +6,6 @@ from extractor.normalizer import Normalizer
 from extractor.llm.factory import get_llm_client
 from extractor.location_prompt import build_location_prompt
 
-
 class SurveyLocationExtractor:
     SURVEY_PATTERN = re.compile(
         r"""
@@ -40,36 +39,45 @@ class SurveyLocationExtractor:
 
         return self._extract_locations(contexts)
 
-    def _build_contexts(self, survey_numbers: list[str]) -> list[dict]:
+    def _build_contexts(self, survey_numbers: list[str]):
+
         contexts = []
-        seen = set()
 
-        for match in self.SURVEY_PATTERN.finditer(self.text):
-            raw_survey = match.group("survey_number")
+        matches = list(self.SURVEY_PATTERN.finditer(self.text))
 
-            normalized = Normalizer.normalize_survey_numbers([raw_survey])
+        MAX_CONTEXTS = 5
 
-            if not normalized:
+        for i, match in enumerate(matches):
+
+            # Stop after collecting 10 contexts
+            if len(contexts) >= MAX_CONTEXTS:
+                break
+
+            # -----------------------------
+            # Current survey
+            # -----------------------------
+            current_survey = Normalizer.normalize_survey_numbers([match.group(1)])[0]
+
+            if current_survey not in survey_numbers:
                 continue
 
-            survey_number = normalized[0]
+            # -----------------------------
+            # Context Start
+            # -----------------------------
+            start = match.start()
 
-            if survey_number not in survey_numbers:
-                continue
+            MAX_CONTEXT = 300
 
-            if survey_number in seen:
-                continue
+            if i + 1 < len(matches):
+                end = min(matches[i + 1].start(), start + MAX_CONTEXT)
+            else:
+                end = min(len(self.text), start + MAX_CONTEXT)
 
-            seen.add(survey_number)
-
-            start = max(0, match.start() - self.CONTEXT_BEFORE)
-            end = min(len(self.text), match.end() + self.CONTEXT_AFTER)
-
-            context = " ".join(self.text[start:end].split())
+            context = self.text[start:end]
 
             contexts.append(
                 {
-                    "survey_number": survey_number,
+                    "survey_number": current_survey,
                     "context": context,
                 }
             )
@@ -88,6 +96,10 @@ class SurveyLocationExtractor:
             response = self.client.generate(prompt)
 
             try:
+                print("=" * 80)
+                print(response)
+                print("=" * 80)
+
                 result = json.loads(response)
 
                 if isinstance(result, list):
@@ -98,21 +110,54 @@ class SurveyLocationExtractor:
             except Exception:
                 print(f"Failed to parse response:\n{response}")
 
-        # Merge results for the same survey number
+        # ------------------------------------------------------------------
+        # STEP 1: Merge all occurrences of the same survey number
+        # ------------------------------------------------------------------
         merged = {}
 
         for location in results:
-            survey_number = location.get("survey_number")
+            survey = location["survey_number"]
 
-            if survey_number not in merged:
-                merged[survey_number] = location
+            if survey not in merged:
+                merged[survey] = location.copy()
             else:
-                existing = merged[survey_number]
+                existing = merged[survey]
 
                 for field in ("village", "hobli", "taluk", "district"):
                     if existing.get(field) is None and location.get(field) is not None:
                         existing[field] = location[field]
 
-        return list(merged.values())
+        results = list(merged.values())
 
-        
+        # ------------------------------------------------------------------
+        # STEP 2: Find the most complete location
+        # ------------------------------------------------------------------
+        best_location = None
+        best_score = -1
+
+        for location in results:
+            score = sum(
+                location.get(field) is not None
+                for field in ("village", "hobli", "taluk", "district")
+            )
+
+            if score > best_score:
+                best_score = score
+                best_location = location
+
+        # ------------------------------------------------------------------
+        # STEP 3: Copy best location to surveys with NO location information
+        # ------------------------------------------------------------------
+        if best_location:
+            for location in results:
+
+                score = sum(
+                    location.get(field) is not None
+                    for field in ("village", "hobli", "taluk", "district")
+                )
+
+                if score == 0:
+                    for field in ("village", "hobli", "taluk", "district"):
+                        location[field] = best_location.get(field)
+
+        return results

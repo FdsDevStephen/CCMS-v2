@@ -14,15 +14,13 @@ from ocr import OCRProcessor
 from extractor.text_chunker import TextChunker
 from extractor.llm.factory import get_llm_client
 from extractor.parser import LLMResponseParser
-from extractor.prompts import (
-    build_act_extraction_prompt,
-    build_survey_location_prompt,
-)
+from extractor.prompts import build_act_extraction_prompt
 from extractor.regex_extractor import RegexExtractor
 from extractor.utils import get_case_number_from_filename
 from extractor.validator import Validator
 from extractor.normalizer import Normalizer
 from extractor.survey_location import SurveyLocationExtractor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class LegalExtractor:
@@ -35,8 +33,8 @@ class LegalExtractor:
         self.llm = get_llm_client()
 
         self.chunker = TextChunker(
-            chunk_size=3000,
-            overlap=300,
+            chunk_size=6000,
+            overlap=150,
         )
 
         self.ocr = OCRProcessor(
@@ -46,6 +44,26 @@ class LegalExtractor:
             first_page=FIRST_PAGE,
             last_page=LAST_PAGE,
         )
+
+    def _extract_acts_from_chunk(
+        self,
+        chunk: str,
+        sections: list[str],
+    ) -> tuple[list, list]:
+
+        prompt = build_act_extraction_prompt(
+            chunk,
+            sections,
+        )
+
+        llm_response = self.llm.generate(prompt)
+
+        result = LLMResponseParser.parse(llm_response)
+
+        acts = result.get("acts", [])
+        mappings = result.get("act_section_mapping", [])
+
+        return acts, mappings
 
     def extract(self, pdf_path: str | Path) -> dict:
 
@@ -63,29 +81,17 @@ class LegalExtractor:
 
         regex_result = regex.extract_all()
 
-        from extractor.normalizer import Normalizer
+        location_extractor = SurveyLocationExtractor(text)
 
-        regex_result["survey_numbers"] = Normalizer.normalize_survey_numbers(
-            regex_result["survey_numbers"]
-        )
+        survey_locations = location_extractor.extract(regex_result["survey_numbers"])
+
+        regex_result["survey_locations"] = survey_locations
 
         regex_result["sections"] = Normalizer.normalize_sections(
             regex_result["sections"]
         )
 
-        # -------------------------------------------------
-        # Use the SAME SurveyLocationExtractor as testor.py
-        # -------------------------------------------------
-
-        location_extractor = SurveyLocationExtractor(text)
-
-        regex_result["survey_locations"] = location_extractor.extract(
-            regex_result["survey_numbers"]
-        )
-
-        regex_result["survey_locations"] = Normalizer.normalize_survey_locations(
-            regex_result["survey_locations"]
-        )
+        regex_result["case_number"] = case_number
 
         print("=" * 80)
         print("RAW SURVEY NUMBERS")
@@ -93,8 +99,6 @@ class LegalExtractor:
 
         for survey in regex_result["survey_numbers"]:
             print(repr(survey))
-
-        regex_result["case_number"] = case_number
 
         # ======================================================
         # Chunk OCR Text
@@ -104,48 +108,44 @@ class LegalExtractor:
 
         all_acts = []
         all_mappings = []
-        all_survey_locations = []
 
         print(f"\nTotal Chunks : {len(chunks)}\n")
 
         # ======================================================
-        # LLM Extraction (Chunk by Chunk)
+        # LLM Extraction (Acts Only)
         # ======================================================
 
-        for index, chunk in enumerate(chunks, start=1):
+        MAX_WORKERS = 4
 
-            prompt = build_act_extraction_prompt(
-                chunk,
-                regex_result["sections"],
-            )
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 
-            try:
-
-                llm_response = self.llm.generate(prompt)
-
-                result = LLMResponseParser.parse(llm_response)
-
-                acts = result.get("acts", [])
-                mappings = result.get("act_section_mapping", [])
-
-                all_acts.extend(acts)
-                all_mappings.extend(mappings)
-
-                location_prompt = build_survey_location_prompt(
+            futures = {
+                executor.submit(
+                    self._extract_acts_from_chunk,
                     chunk,
-                    regex_result["survey_numbers"],
-                )
+                    regex_result["sections"],
+                ): index
 
-                location_response = self.llm.generate(location_prompt)
-                location_result = LLMResponseParser.parse(location_response)
+                for index, chunk in enumerate(chunks, start=1)
+            }
 
-                all_survey_locations.extend(location_result.get("survey_locations", []))
+            for future in as_completed(futures):
 
-            except Exception as e:
+                chunk_index = futures[future]
 
-                print(f"Chunk {index} Failed")
+                try:
+                    acts, mappings = future.result()
 
-                print(e)
+                    all_acts.extend(acts)
+                    all_mappings.extend(mappings)
+
+                    print(f"Chunk {chunk_index} Completed")
+
+                except Exception as e:
+
+                    print(f"Chunk {chunk_index} Failed")
+
+                    print(e)
 
         # ======================================================
         # Merge LLM Result
@@ -155,9 +155,6 @@ class LegalExtractor:
             "acts": Normalizer.normalize_acts(all_acts),
             "act_section_mapping": Normalizer.normalize_act_section_mapping(
                 all_mappings
-            ),
-            "survey_locations": Normalizer.normalize_survey_locations(
-                all_survey_locations
             ),
         }
 
@@ -178,7 +175,7 @@ class LegalExtractor:
         print("=" * 80)
         print("SURVEY LOCATIONS BEFORE VALIDATOR")
         print("=" * 80)
-        print(regex_result.get("survey_locations"))
+        print(regex_result["survey_locations"])
 
         final_result = Validator.validate(final_result)
 

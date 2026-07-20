@@ -35,6 +35,12 @@ Rules:
 12. Do NOT use markdown.
 13. Do NOT explain anything.
 
+Never return administrative labels as extracted values.
+
+The values for village, hobli, taluk and district must always be place names.
+
+Words such as Village, Hobli, Taluk, Taluka, Tatuk, Taiuk, District, Dist, Dt, Tq and Tk are labels, not values, and must never be returned.
+
 Administrative hierarchy:
 
 Village → Hobli → Taluk → District

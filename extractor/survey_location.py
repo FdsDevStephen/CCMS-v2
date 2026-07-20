@@ -33,7 +33,20 @@ class SurveyLocationExtractor:
         self.client = get_llm_client()
 
     def extract(self, survey_numbers: list[str]):
+        print(">>> SURVEY LOCATION EXTRACTOR VERSION 2 <<<")
         contexts = self._build_contexts(survey_numbers)
+
+        print("\n" + "=" * 100)
+        print("SURVEY CONTEXTS")
+        print("=" * 100)
+
+        for i, context in enumerate(contexts, start=1):
+            print(f"\nContext {i}")
+            print("-" * 100)
+            print(f"Survey Number : {context['survey_number']}")
+            print("-" * 100)
+            print(context["context"])
+            print("-" * 100)
 
         if not contexts:
             return []
@@ -46,7 +59,7 @@ class SurveyLocationExtractor:
 
         matches = list(self.SURVEY_PATTERN.finditer(self.text))
 
-        MAX_CONTEXTS = 10
+        MAX_CONTEXTS = 5
 
         for i, match in enumerate(matches):
 
@@ -82,7 +95,7 @@ class SurveyLocationExtractor:
                     "context": context,
                 }
             )
-
+        print(f"Built {len(contexts)} contexts")
         return contexts
 
 
