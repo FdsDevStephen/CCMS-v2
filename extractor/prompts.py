@@ -419,6 +419,46 @@ Do not extract:
 - act names
 - sections
 
+==================================================
+LOCATION VERIFICATION
+==================================================
+
+Before returning any location, verify that it belongs to the SAME administrative hierarchy as the survey number.
+
+Do NOT collect Village, Hobli, Taluk and District independently from different parts of the document.
+
+Treat the administrative hierarchy as one connected chain.
+
+Village
+↓
+Hobli
+↓
+Taluk
+↓
+District
+
+A higher-level location (Taluk or District) may be returned ONLY if it belongs to the same Village/Hobli chain mentioned with the survey number.
+
+Ignore locations that belong to:
+
+- petitioner addresses
+- respondent addresses
+- advocate addresses
+- court addresses
+- government office addresses
+- police station addresses
+- postal addresses
+- any unrelated property
+- any unrelated survey number
+
+If multiple districts appear in the supplied context, return only the district that is administratively connected to the extracted Village/Hobli/Taluk.
+
+Never choose a district simply because it appears later in the text.
+
+If the relationship between the survey number and a location is uncertain, return null.
+
+Prefer correctness over completeness.
+
 =========================================================
 OUTPUT RULES
 =========================================================

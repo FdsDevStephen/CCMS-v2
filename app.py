@@ -55,14 +55,14 @@ def render_items(title: str, items: list, empty_message: str, style: str = "info
 
 def render_summary(result: dict) -> None:
     """Render extraction summary metrics."""
-    st.header("📄 Extraction Summary")
+    # st.header("📄 Extraction Summary")
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    # col1, col2, col3, col4, col5 = st.columns(5)
 
-    col1.metric("Survey Numbers", len(result.get("survey_numbers", [])))
-    col2.metric("Survey Locations", len(result.get("survey_locations", [])))
-    col3.metric("Sections", len(result.get("sections", [])))
-    col4.metric("Acts", len(result.get("acts", [])))
+    # col1.metric("Survey Numbers", len(result.get("survey_numbers", [])))
+    # col2.metric("Survey Locations", len(result.get("survey_locations", [])))
+    # col3.metric("Sections", len(result.get("sections", [])))
+    # col4.metric("Acts", len(result.get("acts", [])))
 
 
 def render_act_section_mapping(mapping: list) -> None:
@@ -157,8 +157,8 @@ def main() -> None:
         st.exception(error)
         return
 
-    st.divider()
-    render_summary(result)
+    # st.divider()
+    # render_summary(result)
 
     st.divider()
     st.subheader("📌 Case Number")
