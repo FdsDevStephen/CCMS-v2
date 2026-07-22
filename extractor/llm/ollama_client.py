@@ -10,7 +10,7 @@ import time
 
 import ollama
 
-from config import (
+from app.config import (
     MODEL_NAME,
     OLLAMA_HOST,
     MAX_RETRIES,

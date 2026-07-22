@@ -4,7 +4,7 @@ LLM Client Factory
 Returns the configured LLM client.
 """
 
-from config import LLM_PROVIDER
+from app.config import LLM_PROVIDER
 from extractor.llm.base import BaseLLMClient
 from extractor.llm.ollama_client import OllamaClient
 

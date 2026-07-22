@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 
-from config import (
+from app.config import (
     FIRST_PAGE,
     LAST_PAGE,
     OUTPUT_TEXT_FOLDER,
@@ -9,7 +9,7 @@ from config import (
     TESSERACT_PATH,
 )
 
-from ocr import OCRProcessor
+from app.ocr import OCRProcessor
 
 from extractor.text_chunker import TextChunker
 from extractor.llm.factory import get_llm_client

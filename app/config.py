@@ -39,12 +39,15 @@ CHUNK_OVERLAP = 150
 # PROJECT PATHS
 # ==========================================================
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-UPLOAD_FOLDER = BASE_DIR / "uploads"
-OUTPUT_TEXT_FOLDER = BASE_DIR / "output_text"
-OUTPUT_JSON_FOLDER = BASE_DIR / "output_json"
-TEMP_FOLDER = BASE_DIR / "temp"
+DATA_DIR = BASE_DIR / "data"
+
+UPLOAD_FOLDER = DATA_DIR / "uploads"
+OUTPUT_TEXT_FOLDER = DATA_DIR / "output_text"
+OUTPUT_JSON_FOLDER = DATA_DIR / "output_json"
+TEMP_FOLDER = DATA_DIR / "temp"
+
 LOG_FOLDER = BASE_DIR / "logs"
 
 # ==========================================================
@@ -52,6 +55,7 @@ LOG_FOLDER = BASE_DIR / "logs"
 # ==========================================================
 
 for folder in (
+    DATA_DIR,
     UPLOAD_FOLDER,
     OUTPUT_TEXT_FOLDER,
     OUTPUT_JSON_FOLDER,
