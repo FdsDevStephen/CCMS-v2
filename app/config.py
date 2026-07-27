@@ -1,8 +1,5 @@
 from pathlib import Path
 
-# ==========================================================
-# LLM CONFIGURATION
-# ==========================================================
 
 # Current Provider
 # Future Options:
@@ -49,7 +46,7 @@ OUTPUT_JSON_FOLDER = DATA_DIR / "output_json"
 TEMP_FOLDER = DATA_DIR / "temp"
 
 LOG_FOLDER = BASE_DIR / "logs"
-
+ 
 # ==========================================================
 # CREATE PROJECT DIRECTORIES
 # ==========================================================
