@@ -170,9 +170,6 @@ class OCRProcessor:
 
         return text, txt_path
 
-    # ==========================================================
-    # Complete Pipeline (Bytes)
-    # ==========================================================
 
     def process_bytes(self, pdf_bytes: bytes) -> str:
         """

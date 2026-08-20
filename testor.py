@@ -1,62 +1,21 @@
 from pathlib import Path
+from app.ocr import OCRProcessor
 
-from extractor.survey_extractor import SurveyExtractor
-from extractor.survey_location import SurveyLocationExtractor
-from extractor.normalizer import Normalizer
+PDF_PATH = r"C:\Users\steph\Downloads\7.PTCL ACT 1978.pdf"
 
+POPPLER_PATH = r"C:\Users\steph\Downloads\Release-26.02.0-0\poppler-26.02.0\Library\bin"
 
-def main():
-    text = Path(
-        r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\output_text\WP-203118-2025-G.txt"
-    ).read_text(
-        encoding="utf-8",
-        errors="ignore",
-    )
+TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-    # ----------------------------------------------------------
-    # Extract Survey Numbers
-    # ----------------------------------------------------------
-    survey_numbers = SurveyExtractor(text).extract()
-    survey_numbers = Normalizer.normalize_survey_numbers(survey_numbers)
+OUTPUT_FOLDER = Path(r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\data\output_text")
 
-    print("=" * 80)
-    print("SURVEY NUMBERS")
-    print("=" * 80)
+ocr = OCRProcessor(
+    poppler_path=POPPLER_PATH,
+    output_folder=OUTPUT_FOLDER,
+    tesseract_path=TESSERACT_PATH,
+)
 
-    for survey in survey_numbers:
-        print(survey)
+text, path = ocr.process(PDF_PATH)
 
-    # ----------------------------------------------------------
-    # Build Contexts
-    # ----------------------------------------------------------
-    extractor = SurveyLocationExtractor(text)
-    contexts = extractor._build_contexts(survey_numbers)
-
-    print("\n" + "=" * 100)
-    print("SURVEY CONTEXTS")
-    print("=" * 100)
-
-    for i, context in enumerate(contexts, start=1):
-        print(f"\nContext {i}")
-        print("-" * 100)
-        print(f"Survey Number : {context['survey_number']}")
-        print("-" * 100)
-        print(context["context"])
-        print("-" * 100)
-
-    # ----------------------------------------------------------
-    # Extract Survey Locations
-    # ----------------------------------------------------------
-    locations = extractor.extract(survey_numbers)
-    locations = Normalizer.normalize_survey_locations(locations)
-
-    print("\n" + "=" * 80)
-    print("SURVEY LOCATIONS")
-    print("=" * 80)
-
-    for location in locations:
-        print(location)
-
-
-if __name__ == "__main__":
-    main()
+print(text)
+print(f"Saved to: {path}")

@@ -19,9 +19,7 @@ MAX_RETRIES = 3
 # OCR CONFIGURATION
 # ==========================================================
 
-POPPLER_PATH = (
-    r"C:\Users\steph\Downloads\Release-26.02.0-0\poppler-26.02.0\Library\bin"
-)
+POPPLER_PATH = None
 
 # Set to None if Tesseract is already in your system PATH
 TESSERACT_PATH = None
