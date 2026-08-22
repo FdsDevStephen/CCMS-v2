@@ -1,194 +1,270 @@
 from __future__ import annotations
 
-import re
 import json
-from extractor.normalizer import Normalizer
+
 from extractor.llm.factory import get_llm_client
 from extractor.location_prompt import build_location_prompt
 
+from RAG.retriever import LegalRetriever
+
 
 class SurveyLocationExtractor:
-    SURVEY_PATTERN = re.compile(
-        r"""
-        (?:
-            \bS\.?\s*Nos?\.?|
-            \bSy\.?\s*Nos?\.?|
-            \bRe-Sy\.?\s*Nos?\.?|
-            \bRe-Survey\s*Nos?\.?|
-            \bSurvey\s*Nos?\.?|
-            \bSurvey\s*Numbers?|
-            \bSurvey\s*Number
-        )
-        [\s:.-]*
-        (?P<survey_number>\d+(?:/[A-Za-z0-9*]+)*)
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
 
-    CONTEXT_BEFORE = 5
-    CONTEXT_AFTER = 250
-
-    def __init__(self, text: str):
-        self.text = text
+    def __init__(self):
         self.client = get_llm_client()
+        self.retriever = LegalRetriever()
 
-    def extract(self, survey_numbers: list[str]):
-        print(">>> SURVEY LOCATION EXTRACTOR VERSION 2 <<<")
-        contexts = self._build_contexts(survey_numbers)
+    def extract(
+        self,
+        survey_numbers: list[str],
+        top_k: int = 3,
+    ):
+
+        print(">>> SURVEY LOCATION RAG EXTRACTOR <<<")
+
+        contexts = self._build_contexts(
+            survey_numbers,
+            top_k,
+        )
 
         print("\n" + "=" * 100)
         print("SURVEY CONTEXTS")
         print("=" * 100)
 
-        for i, context in enumerate(contexts, start=1):
+        for i, context in enumerate(
+            contexts,
+            start=1,
+        ):
+
             print(f"\nContext {i}")
             print("-" * 100)
-            print(f"Survey Number : {context['survey_number']}")
+
+            print(
+                f"Survey Number : "
+                f"{context['survey_number']}"
+            )
+
             print("-" * 100)
-            print(context["context"])
+
+            print(
+                context["context"]
+            )
+
             print("-" * 100)
 
         if not contexts:
             return []
 
-        return self._extract_locations(contexts)
+        return self._extract_locations(
+            contexts
+        )
 
-    def _build_contexts(self, survey_numbers: list[str]):
+    # ==========================================================
+    # Retrieve Context From Qdrant
+    # ==========================================================
+
+    def _build_contexts(
+        self,
+        survey_numbers: list[str],
+        top_k: int,
+    ):
 
         contexts = []
 
-        matches = list(self.SURVEY_PATTERN.finditer(self.text))
+        for survey_number in survey_numbers:
 
-        MAX_CONTEXTS = 5
-
-        for i, match in enumerate(matches):
-
-            # Stop after collecting 10 contexts
-            if len(contexts) >= MAX_CONTEXTS:
-                break
-
-            # -----------------------------
-            # Current survey
-            # -----------------------------
-            current_survey = Normalizer.normalize_survey_numbers([match.group(1)])[0]
-
-            if current_survey not in survey_numbers:
-                continue
-
-            # -----------------------------
-            # Context Start
-            # -----------------------------
-            start = match.start()
-
-            MAX_CONTEXT = 300
-
-            if i + 1 < len(matches):
-                end = min(matches[i + 1].start(), start + MAX_CONTEXT)
-            else:
-                end = min(len(self.text), start + MAX_CONTEXT)
-
-            context = self.text[start:end]
-
-            contexts.append(
-                {
-                    "survey_number": current_survey,
-                    "context": context,
-                }
+            query = (
+                f"Survey Number {survey_number} "
+                f"land village hobli taluk district"
             )
-        print(f"Built {len(contexts)} contexts")
+
+            results = self.retriever.search(
+                query=query,
+                top_k=top_k,
+            )
+
+            for result in results:
+
+                contexts.append(
+                    {
+                        "survey_number": survey_number,
+                        "context": result.payload[
+                            "text"
+                        ],
+                    }
+                )
+
+        print(
+            f"Built {len(contexts)} contexts"
+        )
+
         return contexts
 
+    # ==========================================================
+    # LLM Location Extraction
+    # ==========================================================
 
+    def _extract_locations(
+        self,
+        contexts: list[dict],
+    ) -> list[dict]:
 
-    def _extract_locations(self, contexts: list[dict]) -> list[dict]:
         results = []
 
-        # Process one context at a time
         for context in contexts:
-            prompt = build_location_prompt([context])
 
-            response = self.client.generate(prompt)
+            prompt = build_location_prompt(
+                [context]
+            )
+
+            response = self.client.generate(
+                prompt
+            )
 
             try:
+
                 print("=" * 80)
                 print(response)
                 print("=" * 80)
 
-                result = json.loads(response)
-                results = self._fill_missing_locations(results)
+                result = json.loads(
+                    response
+                )
 
-                if isinstance(result, list):
-                    results.extend(result)
+                if isinstance(
+                    result,
+                    list,
+                ):
+                    results.extend(
+                        result
+                    )
+
                 else:
-                    results.append(result)
+                    results.append(
+                        result
+                    )
 
             except Exception:
-                print(f"Failed to parse response:\n{response}")
+
+                print(
+                    "Failed to parse response:"
+                )
+
+                print(response)
+
+        return self._merge_results(
+            results
+        )
+
+    # ==========================================================
+    # Merge Results
+    # ==========================================================
+
+    def _merge_results(
+        self,
+        results: list[dict],
+    ) -> list[dict]:
 
         merged = {}
 
         for location in results:
-            survey = location["survey_number"]
+
+            survey = location.get(
+                "survey_number"
+            )
+
+            if not survey:
+                continue
 
             if survey not in merged:
-                merged[survey] = location.copy()
+
+                merged[survey] = (
+                    location.copy()
+                )
+
             else:
-                existing = merged[survey]
 
-                for field in ("village", "hobli", "taluk", "district"):
-                    if existing.get(field) is None and location.get(field) is not None:
-                        existing[field] = location[field]
+                existing = merged[
+                    survey
+                ]
 
-        results = list(merged.values())
+                for field in (
+                    "village",
+                    "hobli",
+                    "taluk",
+                    "district",
+                ):
+
+                    if (
+                        existing.get(field)
+                        is None
+                        and location.get(
+                            field
+                        ) is not None
+                    ):
+
+                        existing[field] = (
+                            location[field]
+                        )
+
+        results = list(
+            merged.values()
+        )
+
+        # Find most complete location
 
         best_location = None
         best_score = -1
 
         for location in results:
+
             score = sum(
-                location.get(field) is not None
-                for field in ("village", "hobli", "taluk", "district")
+                location.get(field)
+                is not None
+                for field in (
+                    "village",
+                    "hobli",
+                    "taluk",
+                    "district",
+                )
             )
 
             if score > best_score:
+
                 best_score = score
                 best_location = location
 
+        # Copy complete location only to
+        # surveys having absolutely no data
+
         if best_location:
+
             for location in results:
 
                 score = sum(
-                    location.get(field) is not None
-                    for field in ("village", "hobli", "taluk", "district")
+                    location.get(field)
+                    is not None
+                    for field in (
+                        "village",
+                        "hobli",
+                        "taluk",
+                        "district",
+                    )
                 )
 
                 if score == 0:
-                    for field in ("village", "hobli", "taluk", "district"):
-                        location[field] = best_location.get(field)
+
+                    for field in (
+                        "village",
+                        "hobli",
+                        "taluk",
+                        "district",
+                    ):
+
+                        location[field] = (
+                            best_location.get(
+                                field
+                            )
+                        )
 
         return results
-    
-    
-    def _fill_missing_locations(self, locations: list[dict]) -> list[dict]:
-        """
-        Fill missing location fields using the most complete record.
-        """
-
-        if not locations:
-            return locations
-
-        # Find the most complete location
-        best = max(
-            locations,
-            key=lambda x: sum(
-                x.get(field) is not None
-                for field in ("village", "hobli", "taluk", "district")
-            ),
-        )
-
-        for location in locations:
-            for field in ("village", "hobli", "taluk", "district"):
-                if location.get(field) is None:
-                    location[field] = best.get(field)
-
-        return locations

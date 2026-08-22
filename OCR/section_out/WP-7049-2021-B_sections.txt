@@ -1,0 +1,91 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+DATES
+-NIL- The land bearing Sy. No. 9 totally measuring 12 Acres 16
+Guntas situated at Lingammanahalli Village, Kadaba
+Hobli, Gubbi Taluk is a Government Gomal Land. Out of
+the said land in the land measuring 4 Acres 10 Guntas
+there is a Government Primary School, Government High
+School and Government Pre-University College and a
+playground for the user of the students of the said
+. schools/colleges. The said portion of 4 Acres 10 Guntas
+is assigned with a new Survey number i.e., 80. Near by the
+said school, there is a Veterinary hospital and a temple. :
+re -NIL- The only approach road to the School/college, veterinary
+hospital and the KG Temple is the cart tract which runs
+from East-West in Sy.No.9
+A portion of the cart tract is blocked by one Nanjundappa
+by putting some structure and garbage on the cart tract
+as a result the students and the general public are facing
+difficulty to reach the school/college, veterinary hospital
+and the temple.
+12-6-2020 A Joint survey was conducted and mahazar was drawn
+which discloses the illegal grabbing of the portion of cart
+tract.
+10-3-2021 Tahsildar issued second eviction notice to the illegal
+occupant of Cart tract but is not taking any coercive steps
+¢ ,
+Hence this writ petition.
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+The land bearing Sy. No. 9 totally measuring 12 Acres 16 Guntas >
+situated at Lingammanahalli Village, Kadaba Hobli, Gubbi Taluk is a *
+Government Gomal Land. Out of the said land in the land measuring 4
+Acres 10 Guntas there is a Government Primary School, Government High
+School and Government Pre-University College and a playground for the
+user of the students of the said schools/colleges. The said portion of 4 Acres
+_ 10 Guntas is assigned with a new Survey number i.e., 80. Near by the said
+school, there is a Veterinary hospital and a temple. The only approach road
+to the School/college, veterinary hospital and the K G Temple is the cart
+tract which runs from East-West in Sy.No.9. A portion of the cart tract is
+blocked by one Nanjundappa by putting some structure and garbage on the
+cart tract as a result the students and the general public are facing difficulty
+to reach the school/college, veterinary hospital and the temple. A Joint
+survey was conducted and mahazar was drawn which discloses the illegal w
+grabbing of the portion of cart tract. Tahsildar issued second eviction notice
+to the illegal occupant of Cart tract but is not taking any coercive steps to
+remove the illegal encroachment of the cart tract. Hence this writ petition. 56
+BENGALURU Mrohesh RB SHEEN
+
+================================================================================
+PRAYER
+================================================================================
+
+Wherefore the Hon’ble Court be pleased to:-
+| u—
+: ? &
+i). Issue writ in the nature of mandamus, directing the respondents to
+take coercive steps against the illegal occupant of the cart tract, in the land
+| bearing Sy. No. 9 of Lingammanahalli Village, Kadaba Hobli, Gubbi Taluk, as
+>
+shown in ANNEXURE “K” dt: 12-6-2020 and to evict him as per the eviction ¥
+notice dt: 10-3-2021 bearing No. NCR CR: 345/19-20 issued by Tahsildar,
+Gubbi-Respondent No.4 marked as ANNEXURE “L”; and
+ii). Pass such other orders as deems fit to grant under the circumstances
+of the case in the interest of Justice.
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-7049-2021-B.pdf
+Total Pages: 41
+Pages Scanned for Discovery: 30
+
+synopsis: {'section': 'synopsis', 'page': 3, 'score': 355.0, 'line': 'SYNOPSIS TABLE', 'kind': 'table'}
+brief_facts: {'section': 'brief_facts', 'page': 4, 'score': 245.0, 'line': 'FACTS IN BRIEF', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 9, 'score': 180, 'line': 'PRAYER', 'kind': 'heading'}
+
+synopsis range: 3-4
+brief_facts range: 4-4
+prayer range: 9-10
+
+fast_scan: 3.546 sec
+full_ocr: 3.285 sec
+extraction: 0.003 sec
+total: 6.915 sec

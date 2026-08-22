@@ -495,3 +495,53 @@ DOCUMENT
 
 Return ONLY valid JSON.
 """
+
+def build_acts_and_locations_prompt(document_text: str) -> str:
+    return f"""
+You are an expert Indian Legal Information Extraction Engine.
+
+Extract ONLY:
+1. "acts": Explicit statutory Acts mentioned in the document (e.g., "Karnataka Land Reforms Act, 1961", "Karnataka Land Revenue Act, 1964").
+2. "survey_locations": Land location details connected to Survey Numbers (e.g., Sy. No., S. No., Survey No., Re-Survey No.).
+
+=========================================================
+FIELD RULES FOR SURVEY LOCATIONS
+=========================================================
+- survey_number: The number/code following Sy. No. / Survey No.
+- village: The name before the word "village".
+- hobli: The name before the word "Hobli".
+- taluk: The name before "Taluk" or "Taluka".
+- district: The name before the word "District".
+Use null for missing fields.
+
+=========================================================
+STRICT EXCLUSIONS
+=========================================================
+- Do NOT extract Constitution of India, Articles, Rules, or Orders as Acts.
+- Do NOT extract court locations, advocate addresses, or party addresses as survey locations.
+
+=========================================================
+OUTPUT FORMAT (STRICT JSON ONLY)
+=========================================================
+{{
+    "acts": [
+        "Act Name, Year"
+    ],
+    "survey_locations": [
+        {{
+            "survey_number": "2",
+            "village": "Kenchammanahalli",
+            "hobli": "Anegodu",
+            "taluk": null,
+            "district": "Davangere"
+        }}
+    ]
+}}
+
+=========================================================
+DOCUMENT EXCERPTS
+=========================================================
+{document_text}
+
+Return ONLY valid JSON.
+"""

@@ -1,0 +1,121 @@
+from __future__ import annotations
+
+from pathlib import Path
+import re
+
+
+class LegalTextChunker:
+    """Split OCR text into embedding-friendly legal text chunks."""
+
+    def __init__(
+        self,
+        chunk_size: int = 300,
+        overlap: int = 60,
+        model_name: str = "BAAI/bge-m3",
+    ):
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be greater than 0.")
+
+        if overlap < 0 or overlap >= chunk_size:
+            raise ValueError(
+                "overlap must be >= 0 and smaller than chunk_size."
+            )
+
+        from transformers import AutoTokenizer
+
+        self.chunk_size = chunk_size
+        self.overlap = overlap
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    def chunk_file(self, txt_path: str | Path) -> list[dict]:
+        txt_path = Path(txt_path)
+
+        if not txt_path.exists():
+            raise FileNotFoundError(f"Text file not found: {txt_path}")
+
+        text = txt_path.read_text(encoding="utf-8", errors="ignore").strip()
+
+        if not text:
+            return []
+
+        sections = self._extract_sections(text)
+        chunks: list[dict] = []
+
+        for section_name, section_text in sections.items():
+            for chunk_id, chunk_text in enumerate(self._split_text(section_text)):
+                chunks.append(
+                    {
+                        "document": txt_path.stem,
+                        "section": section_name,
+                        "chunk_id": chunk_id,
+                        "text": chunk_text,
+                    }
+                )
+
+        return chunks
+
+    def _extract_sections(self, text: str) -> dict[str, str]:
+        """Extract known OCR sections; fall back to the full document."""
+        pattern = re.compile(
+            r"={10,}\s*"
+            r"(PAGES\s*2\s*[-–]\s*13|FULL\s+PRAYER)"
+            r"\s*={10,}",
+            re.IGNORECASE,
+        )
+
+        matches = list(pattern.finditer(text))
+
+        if not matches:
+            return {"full_document": text.strip()}
+
+        sections: dict[str, str] = {}
+
+        for index, match in enumerate(matches):
+            section_name = self._normalize_section_name(match.group(1))
+
+            start = match.end()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+
+            section_text = text[start:end].strip()
+
+            if section_text:
+                sections[section_name] = section_text
+
+        return sections or {"full_document": text.strip()}
+
+    @staticmethod
+    def _normalize_section_name(name: str) -> str:
+        return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", name.lower())).strip("_")
+
+    def _split_text(self, text: str) -> list[str]:
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+        if not text:
+            return []
+
+        token_ids = self.tokenizer.encode(
+            text,
+            add_special_tokens=False,
+        )
+
+        chunks: list[str] = []
+        start = 0
+
+        while start < len(token_ids):
+            end = min(start + self.chunk_size, len(token_ids))
+
+            chunk_text = self.tokenizer.decode(
+                token_ids[start:end],
+                skip_special_tokens=True,
+                clean_up_tokenization_spaces=True,
+            ).strip()
+
+            if chunk_text:
+                chunks.append(chunk_text)
+
+            if end >= len(token_ids):
+                break
+
+            start = end - self.overlap
+
+        return chunks

@@ -1,0 +1,129 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+=
+IN THE HIGH COURT OF KARNATAKA AT BANGALORE
+W.P.No. /2025
+BETWEEN:
+Sri. Bhadraiah & another ...PETITIONERS
+AND
+The State of Karnataka & others ... RESPONDENTS
+SYNOPSYS
+SL. Loa Descriptions |
+. No.
+bs The Petitioners’ family, primarily
+| agriculturists, have been in continuous and
+NIL peaceful possession and cultivation of the land
+bearing Survey No.157, measuring 2 Acres, at
+Melekalahalli Village, Kadaba Hobli, Gubbi
+Taluk, Tumakuru District. The late Sri
+Kalaiah, father of the Petitioners, personally
+cultivated the land for over 5 decades.
+The Tahsildar, Gubbi Taluk, issued an Official |
+2 22.11.2017 Memorandum (Ref: LND.RUC.(KD)CR.135-
+1991-92) confirming the grant of 2 Acres of
+land to Sri Kalaiah under the socio-beneficiary
+= — _scheme for depressed classes- Aadi Karnataka.
+The Tahsildar issued a Saguvali Chit
+3 01.01.2018 formalizing the grant of the said land to Sri
+Kalaiah after detailed enquiry and verification.
+Tahsildar along with survey officials
+, conducted spot inspection and prepared a
+18.09.2024 detailed land sketch demarcating the 2 Acres
+' 4 of land in possession of the Petitioners.
+7024 Mutation was effected in the revenue records,
+= incorporating the name of Sri Kalaiah in the
+5 RTC for Survey No.157 (2 Acres).
+The Assistant Director of Land Records
+6 18.02.2025 (ADLR) without notice conducted Phodi and
+Durasth operations on the land = and
+communicated reduction of 0.24 guntas from
+| Petitioners’ land to the Tahsildar.
+9 tS
+| ADLR prepared a second sketch reflecting the |
+13.05.2025 unauthorized reduction of 0.24 guntas from
+7 the Petitioners’ land and reassigned the same
+; to another landowner. Yt
+- The Tahsildar passed an order (No. TOGUB-
+8 15.05.2025 ADMOLNDG/421/2025) reducing the extent
+of granted land by 0.24 guntas, without issuing
+any notice or hearing to the Petitioners, e
+thereby violating principles of natural justice
+| and statutory procedure “
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+The Petitioners belong to an agrarian family whose livelihood
+depends entirely on the cultivation of agricultural land. The Petitioners
+and their predecessors have been in continuous, peaceful possession
+and cultivation of Survey No.157, measuring 2 Acres. situated at
+Melckalahalli Village, Kadaba Hobli, Gubbi —Taluk, Tumakuru
+District, for over five decades. The Petitioners’ late father, Sri
+Kalaiah S/o Beluraiah, having personally cultivated the land for
+several decades, applied for grant of the said land under the socio-
+beneficiary scheme for Depressed Classes implemented by the
+Government of Karnataka.
+Pursuant to a detailed enquiry, spot inspection, and reports from the
+Village Accountant and Tahsildar, the Bagur Hukum Saguvali
+Committee recommended the grant of 2 Acres in favour of Sn i
+Kalaiah. Accordingly, the Tahsildar issued Official Memorandum
+dated 22.11.2017 and subsequently, on 01.01.2018, issued Saguvali 5
+Chit confirming the grant On 18.09.2024, the Tahsildar along with
+survey officials conducted spot inspection and prepared a detailed
+sketch demarcating the full extent of 2 Acres in possession of the
+Petitioners.
+The name of Sri Kalaiah was duly mutated in the revenue records and
+RTC, with the Petitioners regularly paying land revenue taxes .
+However, without issuing any prior notice or hearing, the Assistant
+Director of Land Records (ADLR) unilaterally conducted Phodi and
+Durasth operations and reduced the Petitioners’ land by 0.24 guntas,
+The Tahsildar, without jurisdiction or due process and despite earlier
+— 4 os
+Durasth operations and reduced the Petitioners’ land by 0.24 guntas,
+The Tahsildar, without jurisdiction or due process and despite earlier
+confirming the grant, passed a unilateral and arbitrary order dated
+15.05.2025, reducing the Petitioners’ granted land by 0.24 guntas,
+causing grave prejudice. Thus the Petitioners aggrieved by in action
+on the part of Respondent revenue authorities, this memorandum of
+Writ Petition.
+“ BANGALORE
+
+================================================================================
+PRAYER
+================================================================================
+
+In view of the above facts and legal grounds, the petitioner prays that
+| this Hon'ble Court may be pleased to:
+l. Issue an appropriate writ of certiorari or any other writ, order
+or direction, quashing and setting aside the order dated 15.05.2025.
+bearing No. TOGUB-ADMOL.NDG/421/2025 e-704578 passed by
+the Tahsildar (Respondent No.4). as annexed at ANNEXURE-H, in
+respect of agricultural land bearing Survey No. 157, measuring an
+extent of 2 Acres, situated at Malekallahalli Village, Kadaba Hobh,
+Gubbi Taluk, Tumakuru District:.
+. 2. Pass such other order/s as this Hon’ble Court deems fit and
+; proper in the circumstances of the case.
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-18309-2025-B.pdf
+Total Pages: 54
+Pages Scanned for Discovery: 30
+
+synopsis: {'section': 'synopsis', 'page': 4, 'score': 550.0, 'line': 'SYNOPSIS TABLE', 'kind': 'table'}
+brief_facts: {'section': 'brief_facts', 'page': 5, 'score': 245.0, 'line': 'BRIEF FACTS', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 16, 'score': 180, 'line': 'PRAYER .', 'kind': 'heading'}
+
+synopsis range: 4-5
+brief_facts range: 5-6
+prayer range: 16-17
+
+fast_scan: 5.372 sec
+full_ocr: 3.931 sec
+extraction: 0.002 sec
+total: 15.774 sec

@@ -1,0 +1,83 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+Sl. | Date Events
+L. -NIL- The petitioner herejn is in unauthorized | e
+occupation of 4 agres of land in
+Sy.No.68/1 of Chikka Agrahara Village,
+Bukkapatna Hobli, Sira Taluk, Tumkur
+=a District. -
+2. -NIL- The petitioner is in possession of the land |
+question from 2000 and sunk a bore-well
+in the land in question and obtained
+electricity connection and planted Areca
+— and Banana plant.
+3. | 15.12.2022 | The petitioner filed application to seeking
+regularization of the land in question for
+her unauthorized occupation. The said
+application was not considered till date,
+I——-; hence this Writ Petition. 7
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+The petitioner herein is in unauthorized occupation of 4 acres
+of land in Sy.No.68/1 of Chikka Agrahara Village,
+Bukkapatna Hobli, Sira Taluk, Tumkur District. The
+petitioner herein sunk a bore-well in the land in question and
+obtained electricity connection and planted Areca and
+Banana plant. The petitioner filed application to seeking
+regularization of the land in question for her unauthorized
+occupation. The said application was not considered till date,
+hence this Writ Petition.
+
+================================================================================
+PRAYER
+================================================================================
+
+WHEREFORE the petitioner prays that this Hon’ble Court be
+pleased to issue a Writ of Mandamus or any other writ,
+suitable direction to the respondents as under:
+a) Direct the 1 respondent herein to constitute a
+committee for considering the application in Form
+No.S7 made by the applicants under the
+provisions of section 94A of the Karnataka Land q
+Revenue Act R/w Rule 108-CCC of Karnataka
+Land Revenue Rules;
+b) Direct the committee for regularization of
+unauthorized occupation to consider the
+application made by the petitioner to the 3”
+respondent in Form No.57 dated 15.12.2022 in
+respect of 4-00 acres of land in Sy.No.68/1 of
+Chikka Agrahara Village;
+0
+: |
+*
+c) Grant such other relief as deemed fit in the facts
+and circumstance of the case by allowing the
+above Writ Petition with cost in the interest of
+justice.
+. « ,
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-12860-2025-B.pdf
+Total Pages: 16
+Pages Scanned for Discovery: 16
+
+synopsis: {'section': 'synopsis', 'page': 2, 'score': 335.0, 'line': 'SYNOPSIS TABLE', 'kind': 'table'}
+brief_facts: {'section': 'brief_facts', 'page': 2, 'score': 140.83333333333334, 'line': 'BRIEF FACTS OF THE CASE -', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 10, 'score': 180, 'line': 'PRAYER', 'kind': 'heading'}
+
+synopsis range: 2-2
+brief_facts range: 2-2
+prayer range: 10-11
+
+fast_scan: 1.724 sec
+full_ocr: 3.961 sec
+extraction: 0.002 sec
+total: 8.589 sec

@@ -1,0 +1,123 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+sh Date | Events ,
+. 1 24.01.2016 |The Deputy Commissioner, Kalaburagi passed |
+. an order converting the land bearing)
+. | : | Sy.No.172/3 of village -Nandur-K into non- oe
+Oo | agriculture. Be |
+g «42 07.01.2017. |The Commissioner Urban Development; ~- .
+- | Authority,.Kalaburagi issued approved layout So oe -
+rn rr | permitting to form approved layout by the} = 7
+) ; | , owner of the said land. , fe |
+3 09.12.2020 |The respondents No.2 & 6 have _ issued | ~
+oe fe Notification _ in _ FILE __.No.CI/97SPQ(E)2019 |
+- oe dated: 09.12.2020, proposing to acquire the | .
+as ren lands of village~ Nandur-K, Tq & Dist:|° ~~
+Kalaburagi. .
+4 23.12.2020 |The respondent No.6 issued notice under
+| Section 28 (2) of KIADB ACT to the petitioner, _
+_ | calling upon to file the objections if any. |
+ean
+. 5 27.01.2021 | The petitioner filed his detailed: objections and
+. | requested to drop the land of the petitioner
+on from the acquisition. proceedings.
+6 | | 2022-23 |The name of petitioner finds place in ROR of. |
+land bearing Sy.No.171/1 and Sy.No.171/*/2 :
+total measuring 10 acres 18 guntas of village | ;
+; Nandur-K, Tq & District: Kalaburagi. So, the | .
+| | present Writ Petition for issue of writ of |
+mandamus is filed before this Hon’ble Court. _
+ae 7 | 28.10.2022 | The Writ Petition filed by the petitioner in Writ |_
+Oo Petition No.202747/2022 for the relief of writ|
+fo. _.. ~~ > fof'mandamus is being allowed by this Hon'ble |
+, . _ oo ce Court. ml. | .
+ee . ven Bod 02.03.2023 . The petitioner -has filed contempt of court-}~-2°0°-
+7 , +. proceedings in CCC No.200052/2023 as| .
+oo ___ | against the respondent authorities.
+ae - 15.04.2023 | The respondent No.6 issued an endorsement. >
+a - - |and submitted her affidavit before the! >.
+ol | Division Bench of this Hon'ble Court, to drop|
+| oo the contempt proceedings. . :
+10 02.06.2023 The contempt proceedings initiated by the - ~
+) complainant/ petitioner are being dropped by |.
+ee ee this Hon’ble Court, observing that there is no | — Fe
+consensus proceedings as contemplated| — -
+nt || under Section 29 (3) and (4) of the KLA.D.e. | .
+: Act-1966. So, the petitioner is before this
+Hon’ble Court by way of present Writ Petition |
+| under Article-226 & 227 of the Constitution of. 7
+4
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+‘It is submitted that, the petitioner herein is the owner and ;
+) possessor of an agriculture land bearing Sy.No.171/1 and
+Sy.No.171/*/2 total measuring an area of 10 acres 18 guntas of
+. Village Nandur-K Taluka and District Kalaburagi. The respondent
+- authorities have proposed for acquisition of the aforesaid lands,
+© however, there is no consensus between the owner and respondent .
+“authorities, no award is being passed within the prescribed period.
+So, the petitioner is before this Hon’ble Court by. way of present = ==
+| " Writ Petition. | |
+Date: doe oF" RMS K.M.GHATE an
+
+================================================================================
+PRAYER
+================================================================================
+
+a. aa WHEREFORE, the petitioner most humbly pray before this 7 -
+, - -Hon’ble Court, to allow the Writ Petition arid pleased toy ot
+- a) Issue a Writ of Certiorari/order/directions, quashing the .
+a, ; endorsement issued by _ respondent No.6 in. FILE | _ 7
+-NO,KIADB/LAND”- ACQUISTTON/K-2023-24/40. «DATED.
+15.04.2023vide ANNEXURE-A to the .Writ Petition and * ;
+| | Notification in FILE NO.C.1/97/SP1/E-2019 Dated 09.12.2020. oo
+ee vide ANNEXURE-B to the Writ Petition. ce oo Co
+b) Issue Writ of Mandamus, directing the respondents
+authorities, to delete the land of the petitioner from the
+° acquisition proceedings, since no procedure laid dgwn under .. -
+Rw”
+oo
+oe re
+Section 28 and 29 of the K.I.A.D.B. Act-1966 is followed, nor
+, Oe there is any agreement between the land owner and the land
+acquiring authority, nor any fair market price is being fixed by
+. the respondent No.4 in respect of the petitioner’s land, till
+today. , _ - : |
+- _ C) Issue appropriate .order/direction, as against the respondent ;
+a _ authorities directing them to pay the damages in. respect of
+| the petitioner's land, which is being kept without any use and _
+| enjoyment since from more than 3 years and the respondent _ a
+a | value in time. So, under Section 16 of the Land “Acquisition oo
+ee . Act-1894 the respondent authorities be directed .to pay the .
+oe . oe ‘damages as per law. | 7 , ) . ee co,
+a : d) Under the above facts and circumstances, total failure on the
+) . - part of respondent authorities, in complying the provisions of ,
+_ —— —KIADB—Act; -the petitioner-may~be-awarded-the-cost“of- the — oo
+ee , oe ‘present Writ Petition, to meet the ends of justice and equity. 00...
+. : g
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-202220-2023-G.pdf
+Total Pages: 65
+Pages Scanned for Discovery: 30
+
+synopsis: {'section': 'synopsis', 'page': 4, 'score': 245.0, 'line': 'SYNOPSIS', 'kind': 'heading'}
+brief_facts: {'section': 'brief_facts', 'page': 6, 'score': 245.0, 'line': 'BRIEF FACTS OF THE CASE', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 20, 'score': 180, 'line': 'PRAYER', 'kind': 'heading'}
+
+synopsis range: 4-6
+brief_facts range: 6-6
+prayer range: 20-23
+
+fast_scan: 3.871 sec
+full_ocr: 5.022 sec
+extraction: 0.003 sec
+total: 8.979 sec

@@ -74,7 +74,11 @@ desktop.ini
 # ==========================================================
 # Data
 # ==========================================================
-
+uploads/
+section_output/
+test_output/
+ocr/
+ocr/section_out/
 data/
 output_text/
 temp/

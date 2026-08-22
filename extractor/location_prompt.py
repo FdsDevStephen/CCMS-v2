@@ -1,207 +1,641 @@
+from __future__ import annotations
+
+
 def build_location_prompt(contexts: list[dict]) -> str:
-    prompt = f"""
-You are an expert legal information extraction system.
 
-Extract the administrative location for EVERY survey number.
+    survey_numbers = list(
+        dict.fromkeys(
+            context["survey_number"]
+            for context in contexts
+        )
+    )
 
-There are exactly {len(contexts)} survey numbers.
-Return exactly {len(contexts)} JSON objects.
+    context_blocks = []
 
-Output format:
+    for index, context in enumerate(contexts, start=1):
 
-[
-    {{
-        "survey_number": "",
-        "village": null,
-        "hobli": null,
-        "taluk": null,
-        "district": null
-    }}
-]
+        context_blocks.append(
+            f"""
+================ CONTEXT {index} ================
 
-Rules:
+SURVEY NUMBER:
+{context["survey_number"]}
 
-1. Return ONE JSON object for EVERY survey number.
-2. Never skip a survey number.
+TEXT:
+{context["context"]}
+
+===================================================
+"""
+        )
+
+    combined_context = "\n".join(context_blocks)
+
+    return f"""
+You are a HIGH-PRECISION Indian legal document information extraction engine.
+
+Your ONLY task is to extract land location information explicitly associated
+with the supplied survey numbers.
+
+IMPORTANT:
+
+NULL IS CORRECT.
+
+NOISE IS WRONG.
+
+GUESSING IS FORBIDDEN.
+
+INFERENCE IS FORBIDDEN.
+
+
+===================================================
+SURVEY NUMBERS
+===================================================
+
+{", ".join(survey_numbers)}
+
+
+===================================================
+ABSOLUTE RULES
+===================================================
+
+1. Return EXACTLY ONE JSON object for every unique survey number.
+
+2. Every survey number must appear EXACTLY ONCE.
+
 3. Use ONLY the supplied context.
-4. Do NOT infer or hallucinate information.
-5. Preserve the survey number exactly.
-6. Preserve the spelling of place names exactly.
-7. Return ONLY place names.
-8. Do NOT include the words Village, Hobli, Taluk, Taluka, Tq, Tk, District or Dist in the extracted values.
-9. Ignore petitioner, respondent, advocate, court, police station and postal addresses.
-10. If a field is missing, return null.
-11. Return ONLY valid JSON.
-12. Do NOT use markdown.
-13. Do NOT explain anything.
 
-Never return administrative labels as extracted values.
+4. NEVER use outside knowledge.
 
-The values for village, hobli, taluk and district must always be place names.
+5. NEVER infer a location.
 
-Words such as Village, Hobli, Taluk, Taluka, Tatuk, Taiuk, District, Dist, Dt, Tq and Tk are labels, not values, and must never be returned.
+6. NEVER guess a location.
 
-Administrative hierarchy:
+7. NEVER reconstruct a location from OCR fragments.
 
-Village → Hobli → Taluk → District
+8. If there is ANY uncertainty, return null.
 
-Administrative abbreviations:
+9. FALSE POSITIVE IS WORSE THAN NULL.
 
-Village = Village
-Hobli = Hobli
-Taluk = Taluk
-Taluka = Taluk
-Tal = Taluk
-Tq = Taluk
-Tk = Taluk
-District = District
-Dist = District
-Dt = District
+10. A location must be explicitly associated with the survey number
+    or with the land/property identified by that survey number.
 
-Special Rules
+11. Do NOT use a location merely because it appears somewhere nearby.
 
-If the document contains
+12. Do NOT copy a location from another survey number.
 
-"Tq & Dist : Kalaburagi"
+13. Do NOT combine unrelated text.
 
-then return
+14. Do NOT use geographical knowledge to complete missing information.
+
+
+===================================================
+FIELDS
+===================================================
+
+Return ONLY these fields:
+
+- village
+- hobli
+- taluk
+- district
+
+
+===================================================
+LOCATION VALUE RULES
+===================================================
+
+Return ONLY the actual location name.
+
+Do NOT include:
+
+Village
+Hobli
+Taluk
+Taluka
+District
+Dist
+Tq
+Tq & Dist
+Tq & District
+
+
+Example:
+
+"Lalithadripura Village"
+
+MUST become:
+
+"village": "Lalithadripura"
+
+
+Example:
+
+"Varuna Hobli"
+
+MUST become:
+
+"hobli": "Varuna"
+
+
+Example:
+
+"Mysore Taluk"
+
+MUST become:
+
+"taluk": "Mysore"
+
+
+Example:
+
+"Mysore District"
+
+MUST become:
+
+"district": "Mysore"
+
+
+===================================================
+CRITICAL OCR NOISE RULE
+===================================================
+
+STOP the location value when the administrative location name ends.
+
+NEVER continue reading into the next OCR text.
+
+Example:
+
+Mysore Taluk
+Nityanand Naik
+| ; 20
+
+CORRECT:
+
+"taluk": "Mysore"
+
+WRONG:
+
+"taluk": "Mysore Nityanand"
+
+WRONG:
+
+"taluk": "Mysore Nityanand Naik"
+
+WRONG:
+
+"taluk": "Mysore Nityanand Naik | ; 20"
+
+
+The following are NEVER part of a location:
+
+- people's names
+- signatures
+- page numbers
+- OCR fragments
+- random symbols
+- respondent numbers
+- dates
+- annexure numbers
+- headers
+- footers
+
+
+===================================================
+PERSON NAME PROTECTION
+===================================================
+
+A person's name MUST NEVER be included in:
+
+- village
+- hobli
+- taluk
+- district
+
+For example:
+
+"Mysore Taluk
+Nityanand Naik"
+
+means:
+
+"taluk": "Mysore"
+
+NOT:
+
+"taluk": "Mysore Nityanand"
+
+NOT:
+
+"taluk": "Mysore Nityanand Naik"
+
+
+===================================================
+VILLAGE
+===================================================
+
+Extract ONLY the village name.
+
+Examples:
+
+"Lalithadripura Village"
+→ "Lalithadripura"
+
+"village Nandur-K"
+→ "Nandur-K"
+
+"Village Nandur-K"
+→ "Nandur-K"
+
+
+===================================================
+HOBLI
+===================================================
+
+Extract ONLY the Hobli name.
+
+Examples:
+
+"Varuna Hobli"
+→ "Varuna"
+
+"Anegodu Hobli"
+→ "Anegodu"
+
+"in Anegod Hobli"
+→ "Anegod"
+
+
+===================================================
+TALUK
+===================================================
+
+Extract ONLY the Taluk name.
+
+Examples:
+
+"Mysore Taluk"
+→ "Mysore"
+
+"Davangere Taluka"
+→ "Davangere"
+
+
+===================================================
+DISTRICT
+===================================================
+
+Extract ONLY the District name.
+
+Examples:
+
+"Mysore District"
+→ "Mysore"
+
+"District: Kalaburagi"
+→ "Kalaburagi"
+
+
+===================================================
+TALUK AND DISTRICT
+===================================================
+
+DO NOT assume that a Taluk is a District.
+
+Example:
+
+"Mysore Taluk"
+
+Return:
+
+"taluk": "Mysore"
+"district": null
+
+
+Do NOT automatically return:
+
+"district": "Mysore"
+
+
+Example:
+
+"Mysore District"
+
+Return:
+
+"district": "Mysore"
+"taluk": null
+
+
+Only return both when both are explicitly stated.
+
+
+===================================================
+TQ & DIST
+===================================================
+
+If the text explicitly says:
+
+"Tq & Dist: Kalaburagi"
+
+and this statement is explicitly associated with the survey number,
+then return:
 
 "taluk": "Kalaburagi"
 "district": "Kalaburagi"
 
-If the document contains
 
-"Taluk & District : Hassan"
+If the text only says:
 
-then return
+"District: Kalaburagi"
 
-"taluk": "Hassan"
-"district": "Hassan"
+return:
 
-==================================================
-LOCATION VERIFICATION
-==================================================
+"district": "Kalaburagi"
 
-Before returning any location, verify that it belongs to the SAME administrative hierarchy as the survey number.
+and:
 
-Do NOT collect Village, Hobli, Taluk and District independently from different parts of the document.
+"taluk": null
 
-Treat the administrative hierarchy as one connected chain.
 
-Village
-↓
-Hobli
-↓
-Taluk
-↓
-District
+Do NOT infer missing administrative levels.
 
-A higher-level location (Taluk or District) may be returned ONLY if it belongs to the same Village/Hobli chain mentioned with the survey number.
 
-Ignore locations that belong to:
+===================================================
+SURVEY NUMBER ASSOCIATION
+===================================================
 
+A location is valid only when the text explicitly connects it to the
+survey number.
+
+VALID:
+
+"Sy.No.171/1 of Village Nandur-K"
+
+VALID:
+
+"land bearing Sy.No.171/1 situated at Village Nandur-K"
+
+VALID:
+
+"Sy.No.76 in Lalithadripura Village, Varuna Hobli, Mysore Taluk"
+
+
+INVALID:
+
+"Sy.No.76 ..."
+
+followed later by:
+
+"Lalithadripura Village"
+
+unless the text explicitly connects them.
+
+
+===================================================
+NO CROSS-SURVEY COPYING
+===================================================
+
+Never copy a location from another survey number.
+
+If:
+
+Sy.No.171/1 → Nandur-K
+
+and:
+
+Sy.No.172/3 → no explicit location
+
+then:
+
+Sy.No.172/3 MUST remain null.
+
+Do not assume both properties have the same location.
+
+
+===================================================
+NO CROSS-CONTEXT MIXING
+===================================================
+
+Do NOT construct one location from unrelated pieces of text.
+
+For example:
+
+Context 1:
+Village = Nandur-K
+
+Context 2:
+Taluk = Kalaburagi
+
+Context 3:
+District = Gulbarga
+
+Do NOT combine them unless the text explicitly establishes
+that they belong to the same survey-number land.
+
+
+===================================================
+IGNORE
+===================================================
+
+Never extract:
+
+- case numbers
+- W.P. numbers
+- O.S. numbers
+- R.A. numbers
+- C.C.C. numbers
+- years
+- dates
+- acres
+- guntas
+- road names
+- building names
+- court addresses
 - petitioner addresses
 - respondent addresses
 - advocate addresses
-- court addresses
 - government office addresses
 - police station addresses
-- postal addresses
-- any unrelated property
-- any unrelated survey number
+- Act names
+- Sections
+- Articles
+- people's names
 
-If multiple districts appear in the supplied context, return only the district that is administratively connected to the extracted Village/Hobli/Taluk.
 
-Never choose a district simply because it appears later in the text.
+===================================================
+EXAMPLES
+===================================================
 
-If the relationship between the survey number and a location is uncertain, return null.
+Example 1:
 
-Prefer correctness over completeness.
+TEXT:
 
-Examples
+"Sy.No.171/1 ... Village Nandur-K, Tq & District: Kalaburagi."
 
-Example 1
-
-Context
-
-Sy.No.173/2 of village Nandur-K,
-Tq & Dist : Kalaburagi
-
-Output
+OUTPUT:
 
 {{
-    "survey_number":"173/2",
-    "village":"Nandur-K",
-    "hobli":null,
-    "taluk":"Kalaburagi",
-    "district":"Kalaburagi"
+    "survey_number": "171/1",
+    "village": "Nandur-K",
+    "hobli": null,
+    "taluk": "Kalaburagi",
+    "district": "Kalaburagi"
 }}
 
-Example 2
 
-Context
+Example 2:
 
-Sy.No.2 measuring 23 Acres 34 Guntas situated at
-Kenchammanahalli village of
-Anegodu Hobli of
-Davangere District
+TEXT:
 
-Output
+"Sy.No.172/3 of village Nandur-K"
+
+OUTPUT:
 
 {{
-    "survey_number":"2",
-    "village":"Kenchammanahalli",
-    "hobli":"Anegodu",
-    "taluk":null,
-    "district":"Davangere"
+    "survey_number": "172/3",
+    "village": "Nandur-K",
+    "hobli": null,
+    "taluk": null,
+    "district": null
 }}
 
-Example 3
 
-Context
+Example 3:
 
-Survey No.54 situated at
-Hosahalli Village,
-Kasaba Hobli,
-Tumakuru Taluk,
-Tumakuru District
+TEXT:
 
-Output
+"Sy.No.76 in Lalithadripura Village, Varuna Hobli, Mysore Taluk."
+
+OUTPUT:
 
 {{
-    "survey_number":"54",
-    "village":"Hosahalli",
-    "hobli":"Kasaba",
-    "taluk":"Tumakuru",
-    "district":"Tumakuru"
+    "survey_number": "76",
+    "village": "Lalithadripura",
+    "hobli": "Varuna",
+    "taluk": "Mysore",
+    "district": null
 }}
 
-Survey Contexts
 
+Example 4:
+
+TEXT:
+
+"Sy.No.76 in Lalithadripura Village, Varuna Hobli,
+Mysore Taluk, Mysore District."
+
+OUTPUT:
+
+{{
+    "survey_number": "76",
+    "village": "Lalithadripura",
+    "hobli": "Varuna",
+    "taluk": "Mysore",
+    "district": "Mysore"
+}}
+
+
+Example 5:
+
+TEXT:
+
+"Mysore Taluk
+Nityanand Naik
+| ; 20"
+
+OUTPUT:
+
+{{
+    "survey_number": "76",
+    "village": null,
+    "hobli": null,
+    "taluk": "Mysore",
+    "district": null
+}}
+
+
+===================================================
+FINAL VALIDATION
+===================================================
+
+Before returning every non-null field, verify:
+
+1. Is it explicitly present?
+
+2. Is it explicitly associated with this survey number?
+
+3. Is it actually a location?
+
+4. Is the administrative type correct?
+
+5. Does the value contain only the location name?
+
+6. Did I accidentally include Village/Hobli/Taluk/District?
+
+7. Did I accidentally include a person's name?
+
+8. Did I accidentally include OCR noise?
+
+9. Did I accidentally include a page number?
+
+10. Did I infer anything?
+
+11. Did I copy information from another survey?
+
+12. Did I confuse Taluk and District?
+
+13. Did I combine unrelated text?
+
+If ANY answer is uncertain:
+
+RETURN NULL.
+
+
+===================================================
+OUTPUT FORMAT
+===================================================
+
+Return ONLY valid JSON.
+
+No markdown.
+
+No explanation.
+
+No comments.
+
+No extra keys.
+
+There must be exactly {len(survey_numbers)} objects.
+
+Every survey number must appear exactly once.
+
+[
+  {{
+    "survey_number": "76",
+    "village": null,
+    "hobli": null,
+    "taluk": null,
+    "district": null
+  }}
+]
+
+
+===================================================
+LEGAL CONTEXT
+===================================================
+
+{combined_context}
+
+
+===================================================
+
+REMEMBER:
+
+NULL IS CORRECT.
+
+NOISE IS WRONG.
+
+GUESSING IS FORBIDDEN.
+
+INFERENCE IS FORBIDDEN.
 """
-
-    for i, item in enumerate(contexts, start=1):
-
-        prompt += f"""
-
--------------------------------------------------------
-
-Survey #{i}
-
-Survey Number
-
-{item["survey_number"]}
-
-Context
-
-{item["context"]}
-
-"""
-
-    prompt += """
-
-Return ONLY the JSON array.
-
-"""
-
-    return prompt

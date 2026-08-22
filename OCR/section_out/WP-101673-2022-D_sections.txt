@@ -1,0 +1,94 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+: DATE | EVENTS |
+Oe 02-04-2014 |There was partition of the land between the 3°°
+| — |respondent and his wife namely Smt. Sangavva. 3
+Acre 02 Guntas of land (new Sy.No.28/2) was
+fallen to the share of 3 respondent and 3-00 Acre .
+. of land ((new Sy.No.28/1) fallen to his Wife’s| |
+oo share. Accordingly ME came to be certified
+allotting new numbers.
+: 14-08-2015 |Smt. Sangavva executed GPA in favour of the
+: ; . Petitioner Company to enable for erecting Wind
+Power in the land. .
+oO — | 01-11-2015 | Further, Smt. Sangavva applied for conversion of.
+a the agriculture land into Non-Agriculture Land
+. . before the Deputy Commissioner, Gadag
+: eee t—™s— le mrd CL ~~
+2018 | As per the partition name of the 3" respondent
+7 and his wife entered in the Record of Rights |
+. | .
+| 21-02-2018 | That, the petitioner Company appeared before the |
+: | | Assistant Commissioner and filed its Written |
+) Arguments
+27-04-2018 |The 3" respondent filed a suit in O.S.No.32/2016
+| . FOR Declaration, mandatory Injunction and
+Permanent Injunction claiming that Smt. | |
+: - Sangawwa has entered into an agreement with the |
+7 petitioner company, the Wind Poles are erected in
+the land of the 3 respondent i.e. in Sy.No. 28/2 ,
+. instead of Sy. No. 28/1. On detail adjudication of
+_ the of the suit, the Trail Court dismissed the suit
+- and challenging the judgment and Decree ,
+, sO R.A.No.56/2018 came to be filed, the same also
+| * dismissed.
+. 17-02-2022 | That,, the . Assistant Commissioner without |
+} ; , authority of law and though having knowledge of
+| - dismissal of the Suit and pendency of Regular
+, Appeal, however, contrary to findings of the Civil
+- , | Court by order dtd:17-02-2022 proceeded to pass
+, | the impugned order | |
+| : That, the petitioner Company appeared before the Assistant
+Commissioner and filed its Written Arguments That, on the Trail Court in a
+full pledged Trial was pleased to dismiss the suit holding that, the T
+plaintiff/3" respondent failed to prove that the Defendant/Petitioner
+_ Company has illegally erected the electrical Pole and Wind Pole in the land -
+. of the plaintiff/3"° respondent. As against the said finding the Regular
+. Appeal preferred by the Regular Appeal same also came to be dismissed. -
+"The Assistant Commissioner having no authority of law and having
+knowledge of the dismissal of suit and Regular Appeal, proceeded to give
+contrary findings to the Civil Court which arrived after recording the
+, evidence of the parties and on full pledged Trial. |
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+NOT FOUND
+
+================================================================================
+PRAYER
+================================================================================
+
+WHEREFORE, it is most respectfully prayed that, this Hon’ble
+, Court be pleased to:
+. a: Issue a Writ of Certiorari quashing the impugned order passed
+by the Assistant Commissioner, Gadag in
+No.L.N.D/A.P./22/2016-17 dtd: 17-02-2022 vide Annexure-B.
+ry
+Ks
+_ b. Issue any other order or direction as this Hon’ble Court deems
+fit, in the circumstances of the case, in the interest of justice
+oo and equity.
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-101673-2022-D.pdf
+Total Pages: 70
+Pages Scanned for Discovery: 30
+
+synopsis: {'section': 'synopsis', 'page': 5, 'score': 133.88888888888889, 'line': '° SYNOPSIS', 'kind': 'heading'}
+brief_facts: None
+prayer: {'section': 'prayer', 'page': 11, 'score': 170.0, 'line': 'PRAYER BODY', 'kind': 'body'}
+
+synopsis range: 5-10
+prayer range: 11-12
+
+fast_scan: 4.390 sec
+full_ocr: 3.234 sec
+extraction: 0.002 sec
+total: 13.230 sec

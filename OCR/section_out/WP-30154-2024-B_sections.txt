@@ -1,0 +1,93 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+i
+IN THE HIGH COURT OF KARNATAKA AT BENGALURU
+W. P. NO. 2024 (KLR) .
+Between:
+U.V. Venkatesh = Petitioner
+And: :
+State of Karnataka and others v Respondents
+SYNOPSIS .
+DATE EVENTS
+24.09.2021 |The Tahasildhar, Shivamogga passed an
+order to mutate the name of the petitioner
+and fifth respondent in the katha and pahani
+of the land bearing Sy.No.58, 63 of Gajanur
+village.
+2022 The order of Tahasildhar was questioned by
+the fourth respondent by filing appeal u/s
+136(2) of Karnataka Land Revenue Act
+before the second respondent in PDA
+No.6/2022
+03.10.2023 |The appeal filed by fourth respondent was
+allowed by third respondent.
+- 27.11.2023 |The petitioner questioned the order of third
+respondent before the second respondent in ,
+RA No.64/2023. .
+19.09.2024 The revision filed by the petitioner was -
+dismissed by the second respondent.
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+The land in Sy.No.58 measuring an extent of 1 acre 5
+guntas and land in Sy.No.63 measuring 2 acres 38 guntas of
+Gajanur Agrahara village, Shivamogga Taluk originally acquired
+by father of the petitioner namely Vasappa Gowda and after his
+2
+Q
+death the fourth respondent made an application before the
+Tahasildhar for change of katha and pahani which was objected
+; by the fifth respondent contending that the father during his
+life time had executed registered Will in favor of petitioner and
+to him and as such the Tahasildhar treating the matter as
+disputed case and after hearing the parties passed an order to
+mutate the name as per the Will through order dated
+24.09.2021 which was questioned by the fourth respondent
+. before the third respondent and third respondent allowed the
+appeal. The petitioner questioned this order before the second
+: respondent who through order dated 19.09.2024 has been
+pleased to dismiss the revision petition filed by the petitioner.
+The petitioner aggrieved by these orders has filed this writ
+petition.
+
+================================================================================
+PRAYER
+================================================================================
+
+Wherefore the petitioner most respectfully prays that this
+Hon'ble Court may kindly be pleased to:-
+i) Issue a writ in the nature of certiorari and quash the
+order dated 19.09.2024 passed by second respondent °
+in R.A. No.64/2023 produced as per Annexure-D to the
+writ petition and the order dated 03.10.2023 passed by -
+third respondent in PDA No.6/2022 produced as per
+Annexure-B to the writ petition;
+ii) Issue any appropriate writ or order or direction as this
+Hon‘ble Court finds it appropriate in the admitted facts
+and circumstances of the case in the ends of justice.
+iii) Award the cost of this proceeding.
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-30154-2024-B.pdf
+Total Pages: 24
+Pages Scanned for Discovery: 24
+
+synopsis: {'section': 'synopsis', 'page': 2, 'score': 515.0, 'line': 'SYNOPSIS TABLE', 'kind': 'table'}
+brief_facts: {'section': 'brief_facts', 'page': 2, 'score': 103.33333333333333, 'line': 'RIEF FACTS OF THE CASi', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 8, 'score': 180, 'line': 'PRAYER', 'kind': 'heading'}
+
+synopsis range: 2-2
+brief_facts range: 2-3
+prayer range: 8-9
+
+fast_scan: 4.160 sec
+full_ocr: 3.244 sec
+extraction: 0.001 sec
+total: 7.500 sec

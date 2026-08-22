@@ -9,7 +9,7 @@ LLM_PROVIDER = "ollama"
 
 # Ollama Configuration
 OLLAMA_HOST = "http://localhost:11434"
-MODEL_NAME = "qwen2.5:7b-instruct"
+MODEL_NAME = "qwen2.5:3b-instruct"
 
 # LLM Settings
 REQUEST_TIMEOUT = 120          # Seconds
@@ -27,8 +27,8 @@ TESSERACT_PATH = None
 FIRST_PAGE = 2
 LAST_PAGE = 12
 
-CHUNK_SIZE = 6500
-CHUNK_OVERLAP = 150
+# CHUNK_SIZE = 6500
+# CHUNK_OVERLAP = 150
 
 # ==========================================================
 # PROJECT PATHS

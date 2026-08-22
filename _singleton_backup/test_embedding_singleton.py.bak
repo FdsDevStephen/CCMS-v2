@@ -1,0 +1,261 @@
+"""
+Verifies the process-level embedding cache in RAG/embedding.py.
+
+Run from the repo root:
+
+    python test_embedding_singleton.py
+
+Needs no Qdrant and no Ollama. Downloads nothing if bge-m3 is already in
+the HuggingFace cache. Test order matters: T1 and T2 must run against a
+cold cache, so do not reorder them above the tests that warm it.
+"""
+
+from __future__ import annotations
+
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+import numpy as np
+
+try:
+    import psutil
+
+    PROCESS = psutil.Process()
+except ImportError:
+    PROCESS = None
+
+
+FAILURES: list[str] = []
+
+
+def check(label: str, condition: bool, detail: str = "") -> None:
+    status = "PASS" if condition else "FAIL"
+    suffix = f"  ({detail})" if detail else ""
+    print(f"  [{status}] {label}{suffix}")
+    if not condition:
+        FAILURES.append(label)
+
+
+def rss_gb() -> float:
+    if PROCESS is None:
+        return float("nan")
+    return PROCESS.memory_info().rss / 1024**3
+
+
+def banner(title: str) -> None:
+    print(f"\n{title}\n{'-' * len(title)}")
+
+
+# ==========================================================
+# T1  Importing must not load anything
+# ==========================================================
+
+banner("T1  import is free")
+
+rss_before_import = rss_gb()
+
+import RAG.embedding as embedding  # noqa: E402
+from RAG.chunker import LegalTextChunker  # noqa: E402
+from RAG.embedding import (  # noqa: E402
+    DEFAULT_MODEL_NAME,
+    EmbeddingModel,
+    get_embedding_model,
+    get_tokenizer,
+)
+from RAG.hybrid_retreiver import HybridRetriever  # noqa: E402
+
+check(
+    "no model loaded by import alone",
+    len(embedding._MODEL_CACHE) == 0,
+    f"_MODEL_CACHE={list(embedding._MODEL_CACHE)}",
+)
+check(
+    "no tokenizer loaded by import alone",
+    len(embedding._TOKENIZER_CACHE) == 0,
+    f"_TOKENIZER_CACHE={list(embedding._TOKENIZER_CACHE)}",
+)
+print(f"  RSS after imports: {rss_gb():.2f} GB (was {rss_before_import:.2f})")
+
+
+# ==========================================================
+# T2  Concurrent cold start loads exactly once
+# ==========================================================
+#
+# This is the reason the cache uses an explicit dict + lock instead of
+# functools.lru_cache: lru_cache is not atomic, so two threads racing on
+# a cold cache both run the loader. Under FastAPI's sync-endpoint
+# threadpool that means two concurrent uploads each build a copy.
+
+banner("T2  thread-safe cold start (8 threads)")
+
+load_count = 0
+load_lock = threading.Lock()
+real_from_pretrained = embedding.AutoModel.from_pretrained
+
+
+def counting_from_pretrained(*args, **kwargs):
+    global load_count
+    with load_lock:
+        load_count += 1
+    return real_from_pretrained(*args, **kwargs)
+
+
+embedding.AutoModel.from_pretrained = counting_from_pretrained
+try:
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        started = time.perf_counter()
+        models = list(pool.map(lambda _: get_embedding_model(), range(8)))
+        elapsed = time.perf_counter() - started
+finally:
+    embedding.AutoModel.from_pretrained = real_from_pretrained
+
+check(
+    "AutoModel.from_pretrained called exactly once",
+    load_count == 1,
+    f"called {load_count}x",
+)
+check(
+    "all 8 threads got the same object",
+    all(model is models[0] for model in models),
+    f"{len({id(m) for m in models})} distinct object(s)",
+)
+print(f"  8 concurrent calls resolved in {elapsed:.2f}s")
+
+
+# ==========================================================
+# T3  Warm lookups are free and identical
+# ==========================================================
+
+banner("T3  warm lookup")
+
+started = time.perf_counter()
+model_a = get_embedding_model()
+first = time.perf_counter() - started
+
+started = time.perf_counter()
+model_b = get_embedding_model()
+second = time.perf_counter() - started
+
+check("get_embedding_model() is idempotent", model_a is model_b)
+check(
+    "warm lookup is effectively free",
+    second < 0.01,
+    f"{second:.4f}s",
+)
+check(
+    "cache holds one entry",
+    list(embedding._MODEL_CACHE) == [DEFAULT_MODEL_NAME],
+    f"{list(embedding._MODEL_CACHE)}",
+)
+print(f"  lookup timings: {first:.4f}s then {second:.4f}s")
+
+
+# ==========================================================
+# T4  Chunker shares the tokenizer
+# ==========================================================
+
+banner("T4  tokenizer is shared, not duplicated")
+
+started = time.perf_counter()
+chunker = LegalTextChunker(chunk_size=450, overlap=50)
+chunker_build = time.perf_counter() - started
+
+check(
+    "LegalTextChunker reuses the cached tokenizer",
+    chunker.tokenizer is get_tokenizer(),
+)
+check(
+    "chunker tokenizer is the encoder's tokenizer",
+    chunker.tokenizer is model_a.tokenizer,
+)
+check(
+    "chunker construction no longer pays a load",
+    chunker_build < 0.01,
+    f"{chunker_build:.4f}s",
+)
+
+
+# ==========================================================
+# T5  HybridRetriever stays lazy
+# ==========================================================
+#
+# ActExtractor only ever calls build_bm25(), which is pure Python. It
+# must not drag in the encoder or touch Qdrant.
+
+banner("T5  HybridRetriever defers the encoder")
+
+retriever = HybridRetriever()
+check(
+    "construction does not build LegalRetriever",
+    retriever._vector_retriever is None,
+)
+
+retriever.build_bm25(
+    [
+        {"document": "d", "section": "body", "chunk_id": 0,
+         "text": "under Section 4 of the Land Acquisition Act"},
+        {"document": "d", "section": "full_prayer", "chunk_id": 0,
+         "text": "issue a writ of certiorari quashing the notification"},
+    ]
+)
+check(
+    "build_bm25 does not build LegalRetriever",
+    retriever._vector_retriever is None,
+)
+check("build_bm25 actually indexed", retriever.bm25 is not None)
+
+
+# ==========================================================
+# T6  Cached model is numerically identical to a fresh one
+# ==========================================================
+#
+# The whole point: sharing must not change a single output bit, or every
+# vector already in Qdrant is silently invalidated.
+
+banner("T6  numerical equivalence vs a fresh instance")
+
+TEXTS = [
+    "Petitioner seeks quashing of the notification under Section 4(1).",
+    "Sy. No. 45/2 of Bommasandra Village, Attibele Hobli, Anekal Taluk.",
+    "WHEREFORE the petitioner prays that this Hon'ble Court be pleased to",
+]
+
+cached_vectors = get_embedding_model().encode(TEXTS)
+
+print("  loading a second, uncached copy for comparison...")
+fresh_vectors = EmbeddingModel().encode(TEXTS)
+
+max_diff = float(np.abs(cached_vectors - fresh_vectors).max())
+norms = np.linalg.norm(cached_vectors, axis=1)
+
+check("output shape unchanged", cached_vectors.shape == fresh_vectors.shape,
+      f"{cached_vectors.shape}")
+check("embeddings bit-identical", max_diff == 0.0, f"max abs diff {max_diff:g}")
+check("vectors L2-normalized", bool(np.allclose(norms, 1.0, atol=1e-5)),
+      f"norms {norms.round(6).tolist()}")
+check("dimension is 1024", cached_vectors.shape[1] == 1024,
+      f"{cached_vectors.shape[1]}")
+
+
+# ==========================================================
+# SUMMARY
+# ==========================================================
+
+banner("SUMMARY")
+
+# Point-in-time, NOT a peak — safetensors mmaps the weights, so resident
+# pages get evicted and this reading drifts. Useful only as a sanity
+# check that nothing is pinning gigabytes. For a real peak comparison,
+# measure two separate processes with tracemalloc or /usr/bin/time.
+print(f"  RSS now: {rss_gb():.2f} GB "
+      f"(two copies live — T6 loaded one on purpose)")
+
+if FAILURES:
+    print(f"\n  {len(FAILURES)} FAILED:")
+    for failure in FAILURES:
+        print(f"    - {failure}")
+    sys.exit(1)
+
+print("\n  all checks passed")

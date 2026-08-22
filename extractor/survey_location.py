@@ -101,37 +101,39 @@ class SurveyLocationExtractor:
 
 
     def _extract_locations(self, contexts: list[dict]) -> list[dict]:
-        results = []
+        prompt = build_location_prompt(contexts)
 
-        # Process one context at a time
-        for context in contexts:
-            prompt = build_location_prompt([context])
+        response = self.client.generate(prompt)
 
-            response = self.client.generate(prompt)
+        print("=" * 80)
+        print(response)
+        print("=" * 80)
 
-            try:
-                print("=" * 80)
-                print(response)
-                print("=" * 80)
+        try:
+            results = json.loads(response)
 
-                result = json.loads(response)
-                results = self._fill_missing_locations(results)
+            if isinstance(results, dict):
+                results = [results]
 
-                if isinstance(result, list):
-                    results.extend(result)
-                else:
-                    results.append(result)
+            if not isinstance(results, list):
+                print("Invalid response format.")
+                return []
 
-            except Exception:
-                print(f"Failed to parse response:\n{response}")
+        except Exception:
+            print(f"Failed to parse response:\n{response}")
+            return []
 
         # ------------------------------------------------------------------
         # STEP 1: Merge all occurrences of the same survey number
         # ------------------------------------------------------------------
+
         merged = {}
 
         for location in results:
-            survey = location["survey_number"]
+            survey = location.get("survey_number")
+
+            if not survey:
+                continue
 
             if survey not in merged:
                 merged[survey] = location.copy()
@@ -139,7 +141,10 @@ class SurveyLocationExtractor:
                 existing = merged[survey]
 
                 for field in ("village", "hobli", "taluk", "district"):
-                    if existing.get(field) is None and location.get(field) is not None:
+                    if (
+                        existing.get(field) is None
+                        and location.get(field) is not None
+                    ):
                         existing[field] = location[field]
 
         results = list(merged.values())
@@ -147,6 +152,7 @@ class SurveyLocationExtractor:
         # ------------------------------------------------------------------
         # STEP 2: Find the most complete location
         # ------------------------------------------------------------------
+
         best_location = None
         best_score = -1
 
@@ -163,9 +169,9 @@ class SurveyLocationExtractor:
         # ------------------------------------------------------------------
         # STEP 3: Copy best location to surveys with NO location information
         # ------------------------------------------------------------------
+
         if best_location:
             for location in results:
-
                 score = sum(
                     location.get(field) is not None
                     for field in ("village", "hobli", "taluk", "district")

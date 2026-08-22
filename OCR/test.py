@@ -23,23 +23,32 @@ except ImportError:
 # CONFIG
 # ==========================================================
 
-DEFAULT_OUTPUT_DIR = Path("section_output")
-DEFAULT_POPPLER_PATH = (
+PDF_PATH = Path(
+    r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WP-7049-2021-B.pdf"
+)
+
+POPPLER_PATH = (
     r"C:\Users\steph\.cache\codex-runtimes"
     r"\codex-primary-runtime"
     r"\dependencies\native\poppler\Library\bin"
 )
 
+OUTPUT_DIR = Path("section_output")
+
 SEARCH_PAGES = 30
+
 FAST_DPI = 80
 FULL_DPI = 300
-MAX_WORKERS = min(8, os.cpu_count() or 4)
+
+MAX_WORKERS = min(
+    8,
+    os.cpu_count() or 4,
+)
 
 
 # ==========================================================
 # DATA
 # ==========================================================
-
 
 @dataclass
 class Candidate:
@@ -54,9 +63,10 @@ class Candidate:
 # NORMALIZATION
 # ==========================================================
 
-
 def normalize(text: str) -> str:
-    return " ".join(text.upper().split())
+    return " ".join(
+        text.upper().split()
+    )
 
 
 def compact(text: str) -> str:
@@ -95,43 +105,51 @@ def has_numbered_row(line: str) -> bool:
     )
 
 
-def clean_lines(text: str) -> list[str]:
-    return [line.strip() for line in text.splitlines() if line.strip()]
-
-
 # ==========================================================
 # PDF PAGE COUNT
 # ==========================================================
 
-
-def get_total_pages(pdf_path: Path) -> int:
+def get_total_pages(
+    pdf_path: Path,
+) -> int:
 
     if PdfReader is not None:
+
         try:
-            return len(PdfReader(str(pdf_path)).pages)
+            return len(
+                PdfReader(
+                    str(pdf_path)
+                ).pages
+            )
+
         except Exception:
             pass
 
     try:
         import fitz
 
-        document = fitz.open(str(pdf_path))
+        document = fitz.open(
+            str(pdf_path)
+        )
 
         try:
             return document.page_count
+
         finally:
             document.close()
 
-    except Exception as exc:
-        raise RuntimeError(
-            "Unable to determine PDF page count. " "Install pypdf or PyMuPDF."
-        ) from exc
+    except Exception:
+        pass
+
+    raise RuntimeError(
+        "Unable to determine PDF page count. "
+        "Install pypdf or PyMuPDF."
+    )
 
 
 # ==========================================================
 # OCR
 # ==========================================================
-
 
 def ocr_image(
     image: np.ndarray,
@@ -167,7 +185,9 @@ def full_ocr_page(args):
 
     page, image = args
 
-    image_array = np.array(image)
+    image_array = np.array(
+        image
+    )
 
     gray = cv2.cvtColor(
         image_array,
@@ -195,21 +215,25 @@ def full_ocr_page(args):
 # FAST SCAN - FIRST 30 PAGES
 # ==========================================================
 
-
 def fast_scan(
     pdf_path: Path,
 ):
 
     start = perf_counter()
 
-    total_pages = get_total_pages(pdf_path)
+    total_pages = get_total_pages(
+        pdf_path
+    )
 
     scan_pages = min(
         SEARCH_PAGES,
         total_pages,
     )
 
-    print(f"\nFast scanning first " f"{scan_pages} pages...")
+    print(
+        f"\nFast scanning first "
+        f"{scan_pages} pages..."
+    )
 
     images = convert_from_path(
         pdf_path,
@@ -233,13 +257,14 @@ def fast_scan(
 
     page_text = {}
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    with ThreadPoolExecutor(
+        max_workers=MAX_WORKERS
+    ) as executor:
 
         for page, text in executor.map(
             fast_ocr_page,
             jobs,
         ):
-
             page_text[page] = text
 
     return (
@@ -252,7 +277,6 @@ def fast_scan(
 # ==========================================================
 # RANGE MERGING
 # ==========================================================
-
 
 def merge_ranges(
     ranges: list[tuple[int, int]],
@@ -269,11 +293,15 @@ def merge_ranges(
         for start, end in ranges
     )
 
-    merged = [sorted_ranges[0]]
+    merged = [
+        sorted_ranges[0]
+    ]
 
     for start, end in sorted_ranges[1:]:
 
-        prev_start, prev_end = merged[-1]
+        prev_start, prev_end = (
+            merged[-1]
+        )
 
         if start <= prev_end + 1:
 
@@ -287,7 +315,9 @@ def merge_ranges(
 
         else:
 
-            merged.append((start, end))
+            merged.append(
+                (start, end)
+            )
 
     return merged
 
@@ -296,7 +326,6 @@ def merge_ranges(
 # FULL OCR
 # ==========================================================
 
-
 def full_ocr_ranges(
     pdf_path: Path,
     ranges: list[tuple[int, int]],
@@ -304,7 +333,9 @@ def full_ocr_ranges(
 
     page_text: dict[int, str] = {}
 
-    for start_page, end_page in merge_ranges(ranges):
+    for start_page, end_page in merge_ranges(
+        ranges
+    ):
 
         images = convert_from_path(
             pdf_path,
@@ -326,13 +357,14 @@ def full_ocr_ranges(
             )
         ]
 
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
 
             for page, text in executor.map(
                 full_ocr_page,
                 jobs,
             ):
-
                 page_text[page] = text
 
     return page_text
@@ -392,14 +424,16 @@ SIGNATURE_MARKERS = [
 # BASIC HELPERS
 # ==========================================================
 
-
 def is_signature(
     line: str,
 ) -> bool:
 
     normalized = normalize(line)
 
-    return any(marker in normalized for marker in SIGNATURE_MARKERS)
+    return any(
+        marker in normalized
+        for marker in SIGNATURE_MARKERS
+    )
 
 
 def is_new_document(
@@ -409,14 +443,23 @@ def is_new_document(
     normalized = normalize(line)
 
     return (
-        normalized.startswith("AFFIDAVIT")
-        or normalized.startswith("VERIFYING AFFIDAVIT")
+        normalized.startswith(
+            "AFFIDAVIT"
+        )
+        or normalized.startswith(
+            "VERIFYING AFFIDAVIT"
+        )
         or (
-            normalized.startswith("IN THE HIGH COURT")
+            normalized.startswith(
+                "IN THE HIGH COURT"
+            )
             and (
-                "BETWEEN" in normalized
-                or "WRIT PETITION" in normalized
-                or "WRIT APPEAL" in normalized
+                "BETWEEN"
+                in normalized
+                or "WRIT PETITION"
+                in normalized
+                or "WRIT APPEAL"
+                in normalized
             )
         )
     )
@@ -438,8 +481,7 @@ def is_grounds_heading(
             and ratio(
                 normalized,
                 target,
-            )
-            >= 85
+            ) >= 85
         ):
             return True
 
@@ -454,15 +496,18 @@ def is_place_heading(
 
     return (
         normalized == "PLACE"
-        or normalized.startswith("PLACE:")
-        or normalized.startswith("PLACE ")
+        or normalized.startswith(
+            "PLACE:"
+        )
+        or normalized.startswith(
+            "PLACE "
+        )
     )
 
 
 # ==========================================================
 # SYNOPSIS HEADING
 # ==========================================================
-
 
 def is_synopsis_heading(
     line: str,
@@ -476,7 +521,9 @@ def is_synopsis_heading(
 
     for target in SYNOPSIS_PATTERNS:
 
-        target_compact = compact(target)
+        target_compact = compact(
+            target
+        )
 
         if compact_line == target_compact:
             return True
@@ -486,12 +533,14 @@ def is_synopsis_heading(
             and ratio(
                 normalized,
                 target,
-            )
-            >= 86
+            ) >= 86
         ):
             return True
 
-        if target_compact in compact_line and len(compact_line) <= 90:
+        if (
+            target_compact in compact_line
+            and len(compact_line) <= 90
+        ):
             return True
 
     return False
@@ -500,7 +549,6 @@ def is_synopsis_heading(
 # ==========================================================
 # BRIEF FACTS HEADING
 # ==========================================================
-
 
 def is_brief_facts_heading(
     line: str,
@@ -514,44 +562,45 @@ def is_brief_facts_heading(
 
     for target in BRIEF_FACTS_PATTERNS:
 
-        target_normalized = normalize(target)
-
-        if normalized == target_normalized:
-            return True
-
-        if len(normalized) <= 100 and target_normalized in normalized:
-            return True
+        target_normalized = normalize(
+            target
+        )
 
         if (
-            len(normalized) <= 100
-            and ratio(
-                normalized,
-                target_normalized,
+            normalized == target_normalized
+            or (
+                len(normalized) <= 90
+                and target_normalized in normalized
             )
-            >= 80
         ):
             return True
 
-    # OCR variants:
-    # BRIEF FACTS
-    # BRIEF-FACTS
-    # RIEF FACTS
-    # BRIF FACTS
-    if re.match(
-        r"^(?:B?RIEF|BRIF)[\s\-.:]+FACTS" r"(?:\s+OF\s+THE\s+CASE)?$",
-        normalized,
+        if (
+            len(normalized) <= 90
+            and ratio(
+                normalized,
+                target_normalized,
+            ) >= 84
+        ):
+            return True
+
+    if (
+        "BRIEF" in compact_line
+        and (
+            "FACT" in compact_line
+            or "FCTS" in compact_line
+            or "CTS" in compact_line
+        )
+        and len(compact_line) <= 80
     ):
         return True
 
-    if "FACTS" in compact_line and (
-        "BRIEF" in compact_line or "BRIF" in compact_line or "RIEF" in compact_line
-    ):
-        return True
-
-    if len(compact_line) <= 100 and (
-        compact_line.startswith("BRIEFFACTS")
-        or compact_line.startswith("RIEFFACTS")
-        or compact_line.startswith("BRIFFACTS")
+    if (
+        len(normalized) <= 80
+        and ratio(
+            normalized,
+            "BRIEF FACTS",
+        ) >= 65
     ):
         return True
 
@@ -562,39 +611,43 @@ def is_brief_facts_heading(
 # INTERIM PRAYER
 # ==========================================================
 
-
 def is_interim_prayer_marker(
     line: str,
 ) -> bool:
 
     normalized = normalize(line)
+    compact_line = compact(line)
 
-    if not normalized:
-        return False
+    if "INTERIMPRAYER" in compact_line:
+        return True
 
-    if "GROUNDS FOR INTERIM PRAYER" in normalized:
-        return False
+    if "INTENIMPRAYER" in compact_line:
+        return True
 
-    stripped = re.sub(
-        r"^[\s\W]*(?:[0-9]{1,3}|[IVX]{1,5})[\s.\-:)]+",
-        "",
-        normalized,
-    )
+    if normalized in {
+        "IL PRAYER",
+        "II PRAYER",
+        "INT PRAYER",
+        "INTE PRAYER",
+    }:
+        return True
 
-    compact_line = compact(stripped)
+    if (
+        "PRAYER" in compact_line
+        and (
+            "INTER" in compact_line
+            or "INTE" in compact_line
+            or "INTENIM" in compact_line
+        )
+    ):
+        return True
 
-    return compact_line in {
-        "INTERIMPRAYER",
-        "INTENIMPRAYER",
-        "INTERMPRAYER",
-        "INTERIMPRAYE",
-    }
+    return False
 
 
 # ==========================================================
 # PRAYER HEADING
 # ==========================================================
-
 
 def is_prayer_heading(
     line: str,
@@ -617,13 +670,15 @@ def is_prayer_heading(
     if stripped == "PRAYER":
         return True
 
-    return normalized.startswith("PRAYER ") and len(normalized) <= 40
+    return (
+        normalized.startswith("PRAYER ")
+        and len(normalized) <= 40
+    )
 
 
 # ==========================================================
 # HEADING SCORE
 # ==========================================================
-
 
 def heading_score(
     line: str,
@@ -657,7 +712,6 @@ def heading_score(
 # INDEX PAGE
 # ==========================================================
 
-
 def is_index_page(
     text: str,
 ) -> bool:
@@ -687,32 +741,54 @@ def is_index_page(
 
 
 # ==========================================================
-# SYNOPSIS TABLE SCORE
+# SYNOPSIS TABLE
 # ==========================================================
-
 
 def synopsis_table_score(
     text: str,
 ) -> float:
 
-    lines = [normalize(line) for line in text.splitlines() if line.strip()]
+    lines = [
+        normalize(line)
+        for line in text.splitlines()
+        if line.strip()
+    ]
 
     page_text = "\n".join(lines)
 
     if is_index_page(text):
         return 0.0
 
-    has_date = "DATE" in page_text or "DATES" in page_text
+    has_date = (
+        "DATE" in page_text
+        or "DATES" in page_text
+    )
 
-    has_events = "EVENT" in page_text or "EVENTS" in page_text
+    has_events = (
+        "EVENT" in page_text
+        or "EVENTS" in page_text
+    )
 
-    has_descriptions = "DESCRIPTION" in page_text or "DESCRIPTIONS" in page_text
+    has_descriptions = (
+        "DESCRIPTION" in page_text
+        or "DESCRIPTIONS" in page_text
+    )
 
-    has_particulars = "PARTICULAR" in page_text or "PARTICULARS" in page_text
+    has_particulars = (
+        "PARTICULAR" in page_text
+        or "PARTICULARS" in page_text
+    )
 
-    has_content_column = has_events or has_descriptions or has_particulars
+    has_content_column = (
+        has_events
+        or has_descriptions
+        or has_particulars
+    )
 
-    has_synopsis_heading = any(is_synopsis_heading(line) for line in lines)
+    has_synopsis_heading = any(
+        is_synopsis_heading(line)
+        for line in lines
+    )
 
     has_sl_no = any(
         token in page_text
@@ -726,12 +802,25 @@ def synopsis_table_score(
         ]
     )
 
-    numeric_rows = sum(1 for line in lines if has_numbered_row(line))
+    numeric_rows = sum(
+        1
+        for line in lines
+        if has_numbered_row(line)
+    )
 
-    nil_rows = sum(1 for line in lines if "NIL" in line)
+    nil_rows = sum(
+        1
+        for line in lines
+        if "NIL" in line
+    )
 
     date_rows = sum(
-        1 for line in lines if (is_date_line(line) or looks_like_year(line))
+        1
+        for line in lines
+        if (
+            is_date_line(line)
+            or looks_like_year(line)
+        )
     )
 
     if not has_date:
@@ -760,26 +849,18 @@ def synopsis_table_score(
     if numeric_rows >= 2:
         score += 45
 
-    if numeric_rows >= 4:
-        score += 30
-
     if date_rows >= 2:
-        score += 50
-
-    if date_rows >= 4:
-        score += 40
+        score += 35
 
     if nil_rows >= 1:
         score += 20
 
-    if has_date and has_events and date_rows >= 3:
-        score += 130
-
-    if has_date and has_descriptions and date_rows >= 3:
-        score += 130
-
-    if has_date and has_particulars and date_rows >= 3:
-        score += 130
+    if (
+        has_synopsis_heading
+        and has_date
+        and has_content_column
+    ):
+        score += 80
 
     return score
 
@@ -787,7 +868,6 @@ def synopsis_table_score(
 # ==========================================================
 # PRAYER BODY SCORE
 # ==========================================================
-
 
 def prayer_page_score(
     text: str,
@@ -842,7 +922,6 @@ def prayer_page_score(
 # COLLECT CANDIDATES
 # ==========================================================
 
-
 def collect_candidates(
     page_text: dict[int, str],
 ):
@@ -855,10 +934,14 @@ def collect_candidates(
 
     for page, text in page_text.items():
 
-        lines = clean_lines(text)
+        lines = [
+            line.strip()
+            for line in text.splitlines()
+            if line.strip()
+        ]
+
         index_page = is_index_page(text)
 
-        # Synopsis heading
         if not index_page:
 
             for line in lines:
@@ -883,10 +966,9 @@ def collect_candidates(
                         )
                     )
 
-        # Synopsis table
         table_score = synopsis_table_score(text)
 
-        if table_score >= 170:
+        if table_score >= 150:
 
             candidates["synopsis"].append(
                 Candidate(
@@ -898,7 +980,6 @@ def collect_candidates(
                 )
             )
 
-        # Brief Facts + Prayer
         if not index_page:
 
             for line in lines:
@@ -956,7 +1037,6 @@ def collect_candidates(
 # SELECT SYNOPSIS
 # ==========================================================
 
-
 def select_synopsis(
     candidates,
     page_text,
@@ -965,58 +1045,58 @@ def select_synopsis(
 
     valid = []
 
-    page_limit = min(
-        12,
-        total_pages,
-        SEARCH_PAGES,
-    )
-
     for candidate in candidates:
-
-        if candidate.page > page_limit:
-            continue
 
         text = page_text.get(
             candidate.page,
             "",
         )
 
-        if candidate.kind == "table":
-
-            score = synopsis_table_score(text)
-
-            if score < 170:
-                continue
-
-            valid.append(candidate)
-
-            continue
-
         if candidate.kind == "heading":
 
             if is_index_page(text):
                 continue
 
-            line_normalized = normalize(candidate.line)
+            line_normalized = normalize(
+                candidate.line
+            )
 
-            if "LIST OF DATES" in line_normalized:
+            is_list_of_dates_heading = (
+                "LIST OF DATES"
+                in line_normalized
+            )
 
-                if synopsis_table_score(text) < 170:
+            if is_list_of_dates_heading:
+
+                if synopsis_table_score(text) < 150:
                     continue
 
-            elif not is_synopsis_heading(candidate.line):
+            elif not is_synopsis_heading(
+                candidate.line
+            ):
                 continue
 
-            valid.append(candidate)
+        elif candidate.kind == "table":
+
+            if candidate.page > SEARCH_PAGES:
+                continue
+
+            if synopsis_table_score(text) < 150:
+                continue
+
+        valid.append(candidate)
 
     if not valid:
         return None
 
-    tables = [c for c in valid if c.kind == "table"]
+    tables = [
+        c
+        for c in valid
+        if c.kind == "table"
+    ]
 
     if tables:
 
-        # Prefer the EARLIEST real synopsis table.
         return min(
             tables,
             key=lambda c: (
@@ -1025,16 +1105,20 @@ def select_synopsis(
             ),
         )
 
-    standalone = [
+    standalone_headings = [
         c
         for c in valid
-        if (c.kind == "heading" and "LIST OF DATES" not in normalize(c.line))
+        if (
+            c.kind == "heading"
+            and "LIST OF DATES"
+            not in normalize(c.line)
+        )
     ]
 
-    if standalone:
+    if standalone_headings:
 
         return min(
-            standalone,
+            standalone_headings,
             key=lambda c: (
                 c.page,
                 -c.score,
@@ -1054,7 +1138,6 @@ def select_synopsis(
 # SELECT BRIEF FACTS
 # ==========================================================
 
-
 def select_brief_facts(
     candidates,
     synopsis_page,
@@ -1064,29 +1147,28 @@ def select_brief_facts(
     valid = [
         c
         for c in candidates
-        if (
-            synopsis_page
-            <= c.page
-            <= min(
-                SEARCH_PAGES,
-                total_pages,
-                synopsis_page + 15,
-            )
+        if c.page >= synopsis_page
+        and c.page <= min(
+            SEARCH_PAGES,
+            total_pages,
+            synopsis_page + 15,
         )
     ]
 
     if not valid:
         return None
 
-    same_page = [c for c in valid if c.page == synopsis_page]
+    same_page = [
+        c
+        for c in valid
+        if c.page == synopsis_page
+    ]
 
     if same_page:
 
-        # Select the first real Brief Facts heading,
-        # not an OCR body artifact.
-        return min(
+        return max(
             same_page,
-            key=lambda c: (-c.score,),
+            key=lambda c: c.score,
         )
 
     return min(
@@ -1102,7 +1184,6 @@ def select_brief_facts(
 # SELECT PRAYER
 # ==========================================================
 
-
 def select_prayer(
     candidates,
     after_page,
@@ -1112,20 +1193,21 @@ def select_prayer(
     valid = [
         c
         for c in candidates
-        if (
-            c.page >= after_page
-            and c.page
-            <= min(
-                SEARCH_PAGES,
-                total_pages,
-            )
+        if c.page >= after_page
+        and c.page <= min(
+            SEARCH_PAGES,
+            total_pages,
         )
     ]
 
     if not valid:
         return None
 
-    headings = [c for c in valid if c.kind == "heading"]
+    headings = [
+        c
+        for c in valid
+        if c.kind == "heading"
+    ]
 
     if headings:
 
@@ -1137,7 +1219,11 @@ def select_prayer(
             ),
         )
 
-    body = [c for c in valid if c.kind == "body"]
+    body = [
+        c
+        for c in valid
+        if c.kind == "body"
+    ]
 
     if body:
 
@@ -1153,9 +1239,8 @@ def select_prayer(
 
 
 # ==========================================================
-# FIND SYNOPSIS END PAGE
+# FIND SYNOPSIS END
 # ==========================================================
-
 
 def find_synopsis_end(
     page_text,
@@ -1174,12 +1259,14 @@ def find_synopsis_end(
         max_page + 1,
     ):
 
-        lines = clean_lines(
-            page_text.get(
+        lines = [
+            line.strip()
+            for line in page_text.get(
                 page,
                 "",
-            )
-        )
+            ).splitlines()
+            if line.strip()
+        ]
 
         for line in lines:
 
@@ -1195,56 +1282,75 @@ def find_synopsis_end(
 
 
 # ==========================================================
-# FIND BRIEF FACTS END PAGE
+# FIND BRIEF FACTS END
 # ==========================================================
-
 
 def find_brief_facts_end(
     page_text,
     start_page,
     total_pages,
-    prayer_page=None,
 ):
 
     max_page = min(
         SEARCH_PAGES,
         total_pages,
-        start_page + 10,
+        start_page + 15,
     )
-
-    # Brief Facts is allowed to continue to the next page.
-    first_boundary_page = min(
-        start_page + 1,
-        max_page,
-    )
-
-    # If Prayer has already been found earlier than our
-    # heuristic boundary, never consume the Prayer page.
-    if prayer_page is not None:
-
-        max_page = min(
-            max_page,
-            prayer_page,
-        )
 
     for page in range(
-        first_boundary_page,
+        start_page,
         max_page + 1,
     ):
 
-        lines = clean_lines(
-            page_text.get(
+        lines = [
+            line.strip()
+            for line in page_text.get(
                 page,
                 "",
-            )
-        )
+            ).splitlines()
+            if line.strip()
+        ]
 
         for index, line in enumerate(lines):
 
             normalized = normalize(line)
 
-            if is_new_document(line):
+            if is_signature(line):
                 return page
+
+            if (
+                "ADVOCATE" in normalized
+                and (
+                    "PETITIONER" in normalized
+                    or "PETITIONERS" in normalized
+                    or "APPELLANT" in normalized
+                    or "APPELLANTS" in normalized
+                    or "RESPONDENT" in normalized
+                )
+            ):
+                return page
+
+            if is_place_heading(line):
+                return page
+
+            if normalized.startswith("DATE"):
+
+                nearby = " ".join(
+                    normalize(x)
+                    for x in lines[
+                        index:min(
+                            index + 5,
+                            len(lines),
+                        )
+                    ]
+                )
+
+                if (
+                    "ADVOCATE" in nearby
+                    or "PETITIONER" in nearby
+                    or "APPELLANT" in nearby
+                ):
+                    return page
 
             if is_grounds_heading(line):
                 return page
@@ -1252,54 +1358,22 @@ def find_brief_facts_end(
             if is_prayer_heading(line):
                 return page
 
-            if is_interim_prayer_marker(line):
+            if is_new_document(line):
                 return page
 
-            if is_place_heading(line):
-                return page
-
-            # Do NOT stop on random OCR signature-looking text.
-            if "ADVOCATE" in normalized and any(
-                token in normalized
-                for token in [
-                    "PETITIONER",
-                    "PETITIONERS",
-                    "APPELLANT",
-                    "APPELLANTS",
-                    "RESPONDENT",
-                ]
-            ):
-                return page
-
-            # Date is only a footer boundary when an advocate
-            # marker is nearby.
-            if normalized.startswith("DATE"):
-
-                nearby = " ".join(
-                    normalize(x)
-                    for x in lines[
-                        index : min(
-                            index + 5,
-                            len(lines),
-                        )
-                    ]
-                )
-
-                if "ADVOCATE" in nearby:
-                    return page
-
-    return max_page
+    return min(
+        total_pages,
+        start_page + 2,
+    )
 
 
 # ==========================================================
-# FIND PRAYER END PAGE
+# FIND PRAYER END
 #
-# Important:
-# If Prayer has no Interim Prayer, retain the entire
-# detected Prayer page. This fixes documents where Prayer,
-# (a), (b), (c), Place and Advocate all share one page.
+# IMPORTANT:
+# Do NOT stop Prayer on its starting page because of
+# OCR signature artifacts.
 # ==========================================================
-
 
 def find_prayer_end(
     page_text,
@@ -1318,60 +1392,113 @@ def find_prayer_end(
         max_page + 1,
     ):
 
-        lines = clean_lines(
-            page_text.get(
+        lines = [
+            line.strip()
+            for line in page_text.get(
                 page,
                 "",
-            )
-        )
+            ).splitlines()
+            if line.strip()
+        ]
 
-        for line in lines:
+        for index, line in enumerate(lines):
+
+            normalized = normalize(line)
+
+            # --------------------------------------------------
+            # These are hard boundaries even on start page.
+            # --------------------------------------------------
 
             if is_interim_prayer_marker(line):
                 return page
 
-            if page > start_page:
+            if is_new_document(line):
+                return page
 
-                if is_new_document(line):
+            if is_grounds_heading(line):
+                return page
+
+            # --------------------------------------------------
+            # IMPORTANT:
+            # Never terminate Prayer on starting page due to
+            # Place / Advocate / signature OCR artifacts.
+            # --------------------------------------------------
+
+            if page == start_page:
+                continue
+
+            # --------------------------------------------------
+            # Subsequent-page signature block.
+            # --------------------------------------------------
+
+            if is_signature(line):
+                return page
+
+            if (
+                "ADVOCATE" in normalized
+                and (
+                    "PETITIONER" in normalized
+                    or "PETITIONERS" in normalized
+                    or "APPELLANT" in normalized
+                    or "APPELLANTS" in normalized
+                    or "RESPONDENT" in normalized
+                )
+            ):
+                return page
+
+            if is_place_heading(line):
+                return page
+
+            if normalized.startswith("DATE"):
+
+                nearby = " ".join(
+                    normalize(x)
+                    for x in lines[
+                        index:min(
+                            index + 5,
+                            len(lines),
+                        )
+                    ]
+                )
+
+                if (
+                    "ADVOCATE" in nearby
+                    or "PETITIONER" in nearby
+                    or "APPELLANT" in nearby
+                ):
                     return page
 
-                if is_grounds_heading(line):
-                    return page
-
-    # Prayer can continue onto the immediately
-    # following page even when there is no
-    # Interim Prayer section.
-    return min(
-        start_page + 1,
-        max_page,
-    )
+    return max_page
 
 
 # ==========================================================
-# TABLE SYNOPSIS START
+# SYNOPSIS TABLE START
 # ==========================================================
-
 
 def find_table_synopsis_start(
     lines,
 ):
 
-    # Explicit Synopsis heading.
     for index, raw_line in enumerate(lines):
 
         if not is_synopsis_heading(raw_line):
             continue
 
         nearby = lines[
-            index : min(
+            index:min(
                 index + 25,
                 len(lines),
             )
         ]
 
-        nearby_text = normalize("\n".join(nearby))
+        nearby_text = normalize(
+            "\n".join(nearby)
+        )
 
-        has_date = "DATE" in nearby_text or "DATES" in nearby_text
+        has_date = (
+            "DATE" in nearby_text
+            or "DATES" in nearby_text
+        )
 
         has_content = (
             "EVENT" in nearby_text
@@ -1382,10 +1509,12 @@ def find_table_synopsis_start(
             or "PARTICULARS" in nearby_text
         )
 
-        if has_date and has_content:
+        if (
+            has_date
+            and has_content
+        ):
             return index + 1
 
-    # List of Dates / Synopsis.
     for index, raw_line in enumerate(lines):
 
         normalized = normalize(raw_line)
@@ -1403,60 +1532,32 @@ def find_table_synopsis_start(
             continue
 
         nearby = lines[
-            index : min(
+            index:min(
                 index + 25,
                 len(lines),
             )
         ]
 
-        nearby_text = normalize("\n".join(nearby))
+        nearby_text = normalize(
+            "\n".join(nearby)
+        )
 
-        if "DATE" in nearby_text and (
+        has_date = (
+            "DATE" in nearby_text
+            or "DATES" in nearby_text
+        )
+
+        has_content = (
             "EVENT" in nearby_text
             or "DESCRIPTION" in nearby_text
             or "PARTICULAR" in nearby_text
-        ):
-            return index + 1
-
-    # Structural fallback.
-    page_text = normalize("\n".join(lines))
-
-    has_date_header = "DATE" in page_text or "DATES" in page_text
-
-    has_content_header = (
-        "EVENT" in page_text
-        or "EVENTS" in page_text
-        or "DESCRIPTION" in page_text
-        or "DESCRIPTIONS" in page_text
-        or "PARTICULAR" in page_text
-        or "PARTICULARS" in page_text
-    )
-
-    if has_date_header and has_content_header:
-
-        date_rows = sum(
-            1 for line in lines if (is_date_line(line) or looks_like_year(line))
         )
 
-        if date_rows >= 2:
-
-            for index, line in enumerate(lines):
-
-                normalized = normalize(line)
-
-                if "DATE" in normalized and (
-                    "EVENT" in normalized
-                    or "DESCRIPTION" in normalized
-                    or "PARTICULAR" in normalized
-                ):
-                    return index + 1
-
-            for index, line in enumerate(lines):
-
-                if "DATE" in normalize(line):
-                    return index + 1
-
-            return 0
+        if (
+            has_date
+            and has_content
+        ):
+            return index + 1
 
     return None
 
@@ -1464,7 +1565,6 @@ def find_table_synopsis_start(
 # ==========================================================
 # SECTION START
 # ==========================================================
-
 
 def find_section_start(
     text,
@@ -1476,18 +1576,17 @@ def find_section_start(
 
     if section == "synopsis":
 
-        if candidate_kind == "table":
-            return 0
+        table_start = (
+            find_table_synopsis_start(lines)
+        )
+
+        if table_start is not None:
+            return table_start
 
         for index, line in enumerate(lines):
 
             if is_synopsis_heading(line):
                 return index + 1
-
-        table_start = find_table_synopsis_start(lines)
-
-        if table_start is not None:
-            return table_start
 
         return None
 
@@ -1511,7 +1610,11 @@ def find_section_start(
 
             normalized = normalize(line)
 
-            if "WHEREFORE" in normalized or "MOST RESPECTFULLY PRAY" in normalized:
+            if (
+                "WHEREFORE" in normalized
+                or "MOST RESPECTFULLY PRAY"
+                in normalized
+            ):
                 return index
 
         return None
@@ -1522,7 +1625,6 @@ def find_section_start(
 # ==========================================================
 # EXTRACT SYNOPSIS
 # ==========================================================
-
 
 def extract_synopsis(
     text,
@@ -1541,12 +1643,9 @@ def extract_synopsis(
     lines = text.splitlines()
     collected = []
 
-    for index in range(
-        start,
-        len(lines),
-    ):
+    for line in lines[start:]:
 
-        line = lines[index].strip()
+        line = line.strip()
 
         if not line:
             continue
@@ -1563,21 +1662,24 @@ def extract_synopsis(
         if is_new_document(line):
             break
 
-        if is_place_heading(line):
+        if is_signature(line):
             break
 
         normalized = normalize(line)
 
-        if "ADVOCATE" in normalized and any(
-            token in normalized
-            for token in [
-                "PETITIONER",
-                "PETITIONERS",
-                "APPELLANT",
-                "APPELLANTS",
-                "RESPONDENT",
-            ]
+        if (
+            "ADVOCATE" in normalized
+            and (
+                "PETITIONER" in normalized
+                or "PETITIONERS" in normalized
+                or "APPELLANT" in normalized
+                or "APPELLANTS" in normalized
+                or "RESPONDENT" in normalized
+            )
         ):
+            break
+
+        if is_place_heading(line):
             break
 
         collected.append(line)
@@ -1586,9 +1688,8 @@ def extract_synopsis(
 
 
 # ==========================================================
-# BRIEF FACTS FOOTER
+# BRIEF FACTS FOOTER DETECTOR
 # ==========================================================
-
 
 def is_brief_facts_footer(
     lines,
@@ -1598,53 +1699,45 @@ def is_brief_facts_footer(
     line = lines[index]
     normalized = normalize(line)
 
-    # Do not stop on standalone dates.
-    # Do not stop on random OCR signature artifacts.
+    if is_signature(line):
+        return True
 
     if is_place_heading(line):
         return True
 
-    if "ADVOCATE" in normalized and any(
-        token in normalized
-        for token in [
-            "PETITIONER",
-            "PETITIONERS",
-            "APPELLANT",
-            "APPELLANTS",
-            "RESPONDENT",
-        ]
+    if normalized.startswith("DATE"):
+        return True
+
+    if (
+        "ADVOCATE" in normalized
+        and (
+            "PETITIONER" in normalized
+            or "PETITIONERS" in normalized
+            or "APPELLANT" in normalized
+            or "APPELLANTS" in normalized
+            or "RESPONDENT" in normalized
+        )
     ):
         return True
 
-    if normalized.startswith("DATE"):
-
-        nearby = " ".join(
-            normalize(x)
-            for x in lines[
-                index : min(
-                    index + 5,
-                    len(lines),
-                )
-            ]
+    # Common city/footer appearing at very bottom.
+    if (
+        index >= max(
+            0,
+            len(lines) - 6,
         )
-
-        if "ADVOCATE" in nearby:
-            return True
-
-    if index >= max(
-        0,
-        len(lines) - 6,
-    ) and normalized in {
-        "BENGALURU",
-        "BANGALORE",
-        "DHARWAD",
-        "MYSURU",
-        "MYSORE",
-        "KALABURAGI",
-        "BELAGAVI",
-        "HUBBALLI",
-        "MANGALURU",
-    }:
+        and normalized in {
+            "BENGALURU",
+            "BANGALORE",
+            "DHARWAD",
+            "MYSURU",
+            "MYSORE",
+            "KALABURAGI",
+            "BELAGAVI",
+            "HUBBALLI",
+            "MANGALURU",
+        }
+    ):
         return True
 
     return False
@@ -1653,7 +1746,6 @@ def is_brief_facts_footer(
 # ==========================================================
 # EXTRACT BRIEF FACTS
 # ==========================================================
-
 
 def extract_brief_facts(
     text,
@@ -1679,6 +1771,8 @@ def extract_brief_facts(
 
         if not line:
             continue
+
+        normalized = normalize(line)
 
         if is_brief_facts_footer(
             lines,
@@ -1706,20 +1800,12 @@ def extract_brief_facts(
 # ==========================================================
 # EXTRACT PRAYER
 #
-# This intentionally does NOT stop on generic OCR
-# signature-like noise. It stops on real structural
-# boundaries only.
+# Multi-page Prayer is preserved.
 # ==========================================================
 
-
 def extract_prayer(
-    text: str,
+    text,
 ):
-
-    lines = text.splitlines()
-
-    if not lines:
-        return ""
 
     start = find_section_start(
         text,
@@ -1729,6 +1815,7 @@ def extract_prayer(
     if start is None:
         return ""
 
+    lines = text.splitlines()
     collected = []
 
     for index in range(
@@ -1744,139 +1831,77 @@ def extract_prayer(
         normalized = normalize(line)
 
         # --------------------------------------------------
-        # REAL SECTION BOUNDARY
+        # Hard boundary: Interim Prayer.
         # --------------------------------------------------
 
         if is_interim_prayer_marker(line):
             break
 
+        # --------------------------------------------------
+        # Hard boundary: new document.
+        # --------------------------------------------------
+
         if is_new_document(line):
             break
+
+        # --------------------------------------------------
+        # Hard boundary: Grounds.
+        # --------------------------------------------------
 
         if is_grounds_heading(line):
             break
 
         # --------------------------------------------------
-        # REAL FOOTER
+        # Signature block.
         # --------------------------------------------------
 
         if is_place_heading(line):
             break
 
-        if "ADVOCATE FOR" in normalized or (
-            "ADVOCATE" in normalized
-            and any(
-                token in normalized
-                for token in [
-                    "PETITIONER",
-                    "PETITIONERS",
-                    "APPELLANT",
-                    "APPELLANTS",
-                    "RESPONDENT",
-                ]
-            )
-        ):
-            break
-
-        # Only treat Date/Dated as footer when an advocate
-        # marker is nearby.
-        if normalized.startswith("DATE") or normalized.startswith("DATED"):
+        if normalized.startswith("DATE"):
 
             nearby = " ".join(
                 normalize(x)
                 for x in lines[
-                    index : min(
-                        index + 6,
+                    index:min(
+                        index + 5,
                         len(lines),
                     )
                 ]
             )
 
-            if "ADVOCATE" in nearby or "ADDRESS FOR SERVICE" in nearby:
+            if (
+                "ADVOCATE" in nearby
+                or "PETITIONER" in nearby
+                or "APPELLANT" in nearby
+            ):
                 break
 
-        # IMPORTANT:
-        # No is_signature(line) check here.
+        if (
+            "ADVOCATE" in normalized
+            and (
+                "PETITIONER" in normalized
+                or "PETITIONERS" in normalized
+                or "APPELLANT" in normalized
+                or "APPELLANTS" in normalized
+                or "RESPONDENT" in normalized
+            )
+        ):
+            break
+
+        # Raw signature OCR artifacts are ignored,
+        # not treated as a section boundary.
+        if is_signature(line):
+            continue
+
         collected.append(line)
 
     return "\n".join(collected).strip()
 
 
 # ==========================================================
-# TARGETED FALLBACK OCR
+# PROCESS DOCUMENT
 # ==========================================================
-
-
-def targeted_fallback_scan(
-    pdf_path: Path,
-    total_pages: int,
-):
-
-    scan_pages = min(
-        SEARCH_PAGES,
-        total_pages,
-    )
-
-    print("\nTargeted 120-DPI scan " "for first 30 pages...")
-
-    images = convert_from_path(
-        pdf_path,
-        dpi=120,
-        poppler_path=POPPLER_PATH,
-        first_page=1,
-        last_page=scan_pages,
-        thread_count=MAX_WORKERS,
-    )
-
-    jobs = [
-        (
-            page,
-            image,
-        )
-        for page, image in enumerate(
-            images,
-            start=1,
-        )
-    ]
-
-    fallback_text = {}
-
-    def fallback_ocr(args):
-
-        page, image = args
-
-        gray = cv2.cvtColor(
-            np.array(image),
-            cv2.COLOR_RGB2GRAY,
-        )
-
-        text = pytesseract.image_to_string(
-            gray,
-            lang="eng",
-            config="--oem 3 --psm 6",
-        )
-
-        return (
-            page,
-            text,
-        )
-
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-
-        for page, text in executor.map(
-            fallback_ocr,
-            jobs,
-        ):
-
-            fallback_text[page] = text
-
-    return fallback_text
-
-
-# ==========================================================
-# PROCESS ONE DOCUMENT
-# ==========================================================
-
 
 def process_document(
     pdf_path: Path,
@@ -1885,19 +1910,27 @@ def process_document(
     total_start = perf_counter()
 
     # ------------------------------------------------------
-    # FAST DISCOVERY
+    # FAST SCAN
     # ------------------------------------------------------
 
     (
         fast_text,
         total_pages,
         fast_time,
-    ) = fast_scan(pdf_path)
-
-    candidates = collect_candidates(fast_text)
+    ) = fast_scan(
+        pdf_path
+    )
 
     # ------------------------------------------------------
-    # SELECT SYNOPSIS
+    # CANDIDATES
+    # ------------------------------------------------------
+
+    candidates = collect_candidates(
+        fast_text
+    )
+
+    # ------------------------------------------------------
+    # SYNOPSIS
     # ------------------------------------------------------
 
     synopsis = select_synopsis(
@@ -1907,7 +1940,7 @@ def process_document(
     )
 
     # ------------------------------------------------------
-    # SELECT BRIEF FACTS
+    # BRIEF FACTS
     # ------------------------------------------------------
 
     brief_facts = None
@@ -1921,7 +1954,7 @@ def process_document(
         )
 
     # ------------------------------------------------------
-    # SELECT PRAYER
+    # PRAYER
     # ------------------------------------------------------
 
     prayer_start = 1
@@ -1942,27 +1975,88 @@ def process_document(
     # TARGETED FALLBACK
     # ------------------------------------------------------
 
-    if synopsis is None or brief_facts is None or prayer is None:
+    if (
+        synopsis is None
+        or brief_facts is None
+        or prayer is None
+    ):
 
-        fallback_text = targeted_fallback_scan(
-            pdf_path,
+        print(
+            "\nTargeted 120-DPI scan "
+            "for first 30 pages..."
+        )
+
+        scan_pages = min(
+            SEARCH_PAGES,
             total_pages,
         )
 
-        fallback_candidates = collect_candidates(fallback_text)
+        fallback_images = convert_from_path(
+            pdf_path,
+            dpi=120,
+            poppler_path=POPPLER_PATH,
+            first_page=1,
+            last_page=scan_pages,
+            thread_count=MAX_WORKERS,
+        )
 
-        if synopsis is None:
+        fallback_jobs = [
+            (
+                page,
+                image,
+            )
+            for page, image in enumerate(
+                fallback_images,
+                start=1,
+            )
+        ]
 
-            fallback_synopsis = select_synopsis(
-                fallback_candidates["synopsis"],
-                fallback_text,
-                total_pages,
+        fallback_text = {}
+
+        def fallback_ocr(args):
+
+            page, image = args
+
+            gray = cv2.cvtColor(
+                np.array(image),
+                cv2.COLOR_RGB2GRAY,
             )
 
-            if fallback_synopsis:
-                synopsis = fallback_synopsis
+            text = pytesseract.image_to_string(
+                gray,
+                lang="eng",
+                config="--oem 3 --psm 6",
+            )
 
-        if brief_facts is None and synopsis:
+            return (
+                page,
+                text,
+            )
+
+        with ThreadPoolExecutor(
+            max_workers=MAX_WORKERS
+        ) as executor:
+
+            for page, text in executor.map(
+                fallback_ocr,
+                fallback_jobs,
+            ):
+                fallback_text[page] = text
+
+        fallback_candidates = collect_candidates(
+            fallback_text
+        )
+
+        fallback_synopsis = select_synopsis(
+            fallback_candidates["synopsis"],
+            fallback_text,
+            total_pages,
+        )
+
+        if fallback_synopsis:
+            synopsis = fallback_synopsis
+
+        if synopsis:
 
             fallback_brief = select_brief_facts(
                 fallback_candidates["brief_facts"],
@@ -1973,41 +2067,48 @@ def process_document(
             if fallback_brief:
                 brief_facts = fallback_brief
 
-        if prayer is None:
+        prayer_start = 1
 
-            prayer_start = 1
+        if brief_facts:
+            prayer_start = brief_facts.page
 
-            if brief_facts:
-                prayer_start = brief_facts.page
+        elif synopsis:
+            prayer_start = synopsis.page
 
-            elif synopsis:
-                prayer_start = synopsis.page
+        fallback_prayer = select_prayer(
+            fallback_candidates["prayer"],
+            prayer_start,
+            total_pages,
+        )
 
-            fallback_prayer = select_prayer(
-                fallback_candidates["prayer"],
-                prayer_start,
-                total_pages,
-            )
+        if fallback_prayer:
+            prayer = fallback_prayer
 
-            if fallback_prayer:
-                prayer = fallback_prayer
-
-        # Use fallback OCR for discovery.
-        fast_text.update(fallback_text)
-
-        candidates = fallback_candidates
+        fast_text.update(
+            fallback_text
+        )
 
     # ------------------------------------------------------
-    # SECTION RANGES
+    # LOCATIONS
     # ------------------------------------------------------
 
-    ranges: dict[str, tuple[int, int]] = {}
+    locations = {
+        "synopsis": synopsis,
+        "brief_facts": brief_facts,
+        "prayer": prayer,
+    }
 
-    # Synopsis
+    # ------------------------------------------------------
+    # RANGES
+    # ------------------------------------------------------
+
+    ranges = {}
+
     if synopsis:
 
         if brief_facts:
             synopsis_end = brief_facts.page
+
         else:
             synopsis_end = find_synopsis_end(
                 fast_text,
@@ -2020,40 +2121,30 @@ def process_document(
             synopsis_end,
         )
 
-    # Brief Facts
     if brief_facts:
-
-        prayer_page = prayer.page if prayer else None
-
-        brief_facts_end = find_brief_facts_end(
-            fast_text,
-            brief_facts.page,
-            total_pages,
-            prayer_page,
-        )
 
         ranges["brief_facts"] = (
             brief_facts.page,
-            brief_facts_end,
+            find_brief_facts_end(
+                fast_text,
+                brief_facts.page,
+                total_pages,
+            ),
         )
 
-    # Prayer
     if prayer:
-
-        prayer_end = find_prayer_end(
-            fast_text,
-            prayer.page,
-            total_pages,
-        )
 
         ranges["prayer"] = (
             prayer.page,
-            prayer_end,
+            find_prayer_end(
+                fast_text,
+                prayer.page,
+                total_pages,
+            ),
         )
 
     # ------------------------------------------------------
-    # Always OCR the complete selected pages.
-    # This deliberately preserves the old working behavior.
+    # FULL OCR
     # ------------------------------------------------------
 
     full_start = perf_counter()
@@ -2063,7 +2154,10 @@ def process_document(
         list(ranges.values()),
     )
 
-    full_time = perf_counter() - full_start
+    full_time = (
+        perf_counter()
+        - full_start
+    )
 
     # ------------------------------------------------------
     # EXTRACTION
@@ -2086,34 +2180,48 @@ def process_document(
 
         section_text = "\n".join(
             full_text_by_page[page]
-            for page in sorted(full_text_by_page)
-            if (start_page <= page <= end_page)
+            for page in sorted(
+                full_text_by_page
+            )
+            if (
+                start_page
+                <= page
+                <= end_page
+            )
         )
 
-        candidate = {
-            "synopsis": synopsis,
-            "brief_facts": brief_facts,
-            "prayer": prayer,
-        }[section]
+        candidate = locations[section]
 
         if section == "synopsis":
 
             sections["synopsis"] = extract_synopsis(
                 section_text,
-                candidate.kind if candidate else None,
+                candidate.kind
+                if candidate
+                else None,
             )
 
         elif section == "brief_facts":
 
-            sections["brief_facts"] = extract_brief_facts(section_text)
+            sections["brief_facts"] = extract_brief_facts(
+                section_text
+            )
 
         else:
 
-            sections["prayer"] = extract_prayer(section_text)
+            sections["prayer"] = extract_prayer(
+                section_text
+            )
 
-    extraction_time = perf_counter() - extraction_start
+    extraction_time = (
+        perf_counter()
+        - extraction_start
+    )
 
-    total_time = perf_counter() - total_start
+    total_time = (
+        perf_counter()
+        - total_start
+    )
 
     return {
         "pdf": str(pdf_path),
@@ -2123,9 +2231,12 @@ def process_document(
             total_pages,
         ),
         "locations": {
-            "synopsis": (asdict(synopsis) if synopsis else None),
-            "brief_facts": (asdict(brief_facts) if brief_facts else None),
-            "prayer": (asdict(prayer) if prayer else None),
+            section: (
+                asdict(candidate)
+                if candidate
+                else None
+            )
+            for section, candidate in locations.items()
         },
         "ranges": {
             section: {
@@ -2157,259 +2268,185 @@ def process_document(
 
 
 # ==========================================================
-# SAVE DOCUMENT OUTPUT
-#
-# Exactly:
-# DocumentName.txt
+# SAVE OUTPUT
 # ==========================================================
 
-
-def save_document_output(
+def save_output(
     pdf_path: Path,
     result: dict,
-    output_dir: Path,
 ):
 
-    output_dir.mkdir(
+    OUTPUT_DIR.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    output_path = output_dir / f"{pdf_path.stem}.txt"
+    output_path = (
+        OUTPUT_DIR
+        / f"{pdf_path.stem}_sections.txt"
+    )
 
     with output_path.open(
         "w",
         encoding="utf-8",
     ) as file:
 
-        for title, key in [
+        for section, title in [
             (
-                "SYNOPSIS",
                 "synopsis",
+                "SYNOPSIS",
             ),
             (
-                "BRIEF FACTS OF THE CASE",
                 "brief_facts",
+                "BRIEF FACTS OF THE CASE",
             ),
             (
-                "PRAYER",
                 "prayer",
+                "PRAYER",
             ),
         ]:
 
             file.write("=" * 80)
-
             file.write(f"\n{title}\n")
-
             file.write("=" * 80)
-
             file.write("\n\n")
 
             file.write(
-                result["sections"].get(
-                    key,
-                    "",
-                )
+                result["sections"][section]
                 or "NOT FOUND"
             )
 
             file.write("\n\n")
 
+        file.write("=" * 80)
+        file.write("\nPROCESS INFORMATION\n")
+        file.write("=" * 80)
+        file.write("\n\n")
+
+        file.write(
+            f"PDF: {result['pdf']}\n"
+        )
+
+        file.write(
+            f"Total Pages: "
+            f"{result['total_pages']}\n"
+        )
+
+        file.write(
+            f"Pages Scanned for Discovery: "
+            f"{result['search_pages']}\n\n"
+        )
+
+        for section, location in result["locations"].items():
+
+            file.write(
+                f"{section}: "
+                f"{location}\n"
+            )
+
+        file.write("\n")
+
+        for section, pages in result["ranges"].items():
+
+            file.write(
+                f"{section} range: "
+                f"{pages['start']}-"
+                f"{pages['end']}\n"
+            )
+
+        file.write("\n")
+
+        for key, value in result["timing"].items():
+
+            file.write(
+                f"{key}: "
+                f"{value:.3f} sec\n"
+            )
+
     return output_path
 
 
 # ==========================================================
-# OCR PROCESSOR
+# MAIN
 # ==========================================================
 
+if __name__ == "__main__":
 
-class OCRProcessor:
-    """
-    Section-aware OCR Processor.
+    print(
+        f"\nDocument: "
+        f"{PDF_PATH.name}"
+    )
 
-    Extracts only:
-    - Synopsis
-    - Brief Facts of the Case
-    - Prayer
+    print(
+        f"PDF Path: "
+        f"{PDF_PATH}"
+    )
 
-    Supports:
-    - PDF file paths
-    - PDF bytes (for Streamlit)
+    if not PDF_PATH.exists():
 
-    No PDF is hardcoded in this module.
-    """
-
-    def __init__(
-        self,
-        poppler_path: str,
-        output_folder: Path,
-        tesseract_path: str | None = None,
-        search_pages: int = 30,
-        fast_dpi: int = 80,
-        full_dpi: int = 300,
-        max_workers: int | None = None,
-    ) -> None:
-
-        self.poppler_path = poppler_path
-        self.output_folder = Path(output_folder)
-
-        self.search_pages = search_pages
-        self.fast_dpi = fast_dpi
-        self.full_dpi = full_dpi
-        self.max_workers = (
-            max_workers if max_workers is not None else min(8, os.cpu_count() or 4)
+        raise FileNotFoundError(
+            f"\nPDF not found:\n"
+            f"{PDF_PATH}"
         )
 
-        if tesseract_path:
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    result = process_document(
+        PDF_PATH
+    )
 
-        self.output_folder.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+    output_path = save_output(
+        PDF_PATH,
+        result
+    )
 
-    def _configure(self) -> None:
-        """
-        Apply instance configuration to the existing OCR pipeline.
-        """
+    print("\n")
+    print("=" * 80)
+    print("SELECTED SECTION LOCATIONS")
+    print("=" * 80)
 
-        global POPPLER_PATH
-        global SEARCH_PAGES
-        global FAST_DPI
-        global FULL_DPI
-        global MAX_WORKERS
+    for section, location in result["locations"].items():
 
-        POPPLER_PATH = self.poppler_path
-        SEARCH_PAGES = self.search_pages
-        FAST_DPI = self.fast_dpi
-        FULL_DPI = self.full_dpi
-        MAX_WORKERS = self.max_workers
+        if location is None:
 
-    def _format_output(self, result: dict) -> str:
-        """
-        Return only the extracted Synopsis, Brief Facts and Prayer.
-        """
-
-        sections = result.get("sections", {})
-
-        output = []
-
-        for title, key in [
-            ("SYNOPSIS", "synopsis"),
-            ("BRIEF FACTS OF THE CASE", "brief_facts"),
-            ("PRAYER", "prayer"),
-        ]:
-
-            output.append("=" * 80)
-            output.append(title)
-            output.append("=" * 80)
-            output.append("")
-            output.append(sections.get(key, "") or "NOT FOUND")
-            output.append("")
-
-        return "\n".join(output).strip()
-
-    def save_text(
-        self,
-        pdf_path: str | Path,
-        text: str,
-    ) -> Path:
-        """
-        Save only Synopsis, Brief Facts and Prayer.
-        """
-
-        pdf_path = Path(pdf_path)
-
-        output_path = self.output_folder / f"{pdf_path.stem}.txt"
-
-        output_path.write_text(
-            text,
-            encoding="utf-8",
-        )
-
-        return output_path
-
-    def process(
-        self,
-        pdf_path: str | Path,
-    ) -> tuple[str, Path]:
-        """
-        Process a PDF file.
-
-        Returns:
-            (
-                extracted_text,
-                saved_text_path
-            )
-        """
-
-        self._configure()
-
-        pdf_path = Path(pdf_path)
-
-        if not pdf_path.exists():
-            raise FileNotFoundError(f"PDF file not found: {pdf_path}")
-
-        result = process_document(pdf_path)
-
-        text = self._format_output(result)
-
-        txt_path = self.save_text(
-            pdf_path,
-            text,
-        )
-
-        return text, txt_path
-
-    def process_bytes(
-        self,
-        pdf_bytes: bytes,
-        filename: str = "document.pdf",
-    ) -> str:
-        """
-        Process uploaded PDF bytes.
-
-        This is intended for Streamlit.
-
-        Returns:
-            Extracted Synopsis, Brief Facts and Prayer.
-        """
-
-        self._configure()
-
-        if not pdf_bytes:
-            raise ValueError("PDF bytes are empty.")
-
-        import tempfile
-
-        suffix = Path(filename).suffix or ".pdf"
-
-        with tempfile.NamedTemporaryFile(
-            suffix=suffix,
-            delete=False,
-        ) as temp_file:
-
-            temp_file.write(pdf_bytes)
-            temp_path = Path(temp_file.name)
-
-        try:
-
-            result = process_document(temp_path)
-
-            text = self._format_output(result)
-
-            output_path = self.output_folder / f"{Path(filename).stem}.txt"
-
-            output_path.write_text(
-                text,
-                encoding="utf-8",
+            print(
+                f"{section:<15}: NOT FOUND"
             )
 
-            return text
+        else:
 
-        finally:
+            print(
+                f"{section:<15}: "
+                f"page={location['page']}, "
+                f"score={location['score']:.1f}, "
+                f"type={location['kind']}, "
+                f"line={location['line']!r}"
+            )
 
-            try:
-                temp_path.unlink()
-            except FileNotFoundError:
-                pass
+    print("\n")
+    print("=" * 80)
+    print("SECTION RANGES")
+    print("=" * 80)
+
+    for section, pages in result["ranges"].items():
+
+        print(
+            f"{section:<15}: "
+            f"{pages['start']}-"
+            f"{pages['end']}"
+        )
+
+    print("\n")
+    print("=" * 80)
+    print("TIMING")
+    print("=" * 80)
+
+    for key, value in result["timing"].items():
+
+        print(
+            f"{key:<25}: "
+            f"{value:.3f} sec"
+        )
+
+    print(
+        "\nOutput:",
+        output_path,
+    )

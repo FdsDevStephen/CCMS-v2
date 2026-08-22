@@ -1,181 +1,144 @@
 from __future__ import annotations
+
 from pathlib import Path
+import json
 
-from app.config import (
-    FIRST_PAGE,
-    LAST_PAGE,
-    OUTPUT_TEXT_FOLDER,
-    POPPLER_PATH,
-    TESSERACT_PATH,
-)
-
-from app.ocr import OCRProcessor
-
-from extractor.text_chunker import TextChunker
-from extractor.llm.factory import get_llm_client
-from extractor.parser import LLMResponseParser
-from extractor.prompts import build_act_extraction_prompt
-from extractor.regex_extractor import RegexExtractor
+from extractor.section_extractor import SectionExtractor
+from extractor.survey_extractor import SurveyExtractor
+from extractor.normalizer import Normalizer
 from extractor.utils import get_case_number_from_filename
 from extractor.validator import Validator
-from extractor.normalizer import Normalizer
-from extractor.survey_location import SurveyLocationExtractor
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class LegalExtractor:
     """
-    Main Legal Information Extraction Pipeline.
+    Legal Information Extraction Pipeline.
+
+    Input:
+        Already extracted OCR text containing:
+        - Synopsis
+        - Brief Facts of the Case
+        - Prayer
+
+    Output:
+        - Case Number
+        - Sections
+        - Survey Numbers
     """
 
     def __init__(self):
+        pass
 
-        self.llm = get_llm_client()
-
-        self.chunker = TextChunker(
-            chunk_size=6000,
-            overlap=150,
-        )
-
-        self.ocr = OCRProcessor(
-            poppler_path=POPPLER_PATH,
-            output_folder=OUTPUT_TEXT_FOLDER,
-            tesseract_path=TESSERACT_PATH,
-            first_page=FIRST_PAGE,
-            last_page=LAST_PAGE,
-        )
-
-    def _extract_acts_from_chunk(
+    def extract(
         self,
-        chunk: str,
-        sections: list[str],
-    ) -> tuple[list, list]:
+        text: str,
+        case_number: str = "",
+    ) -> dict:
 
-        prompt = build_act_extraction_prompt(
-            chunk,
-            sections,
+        # ---------------------------------------------------------
+        # 1. Extract Sections
+        # ---------------------------------------------------------
+
+        print(
+            ">>> EXTRACTING SECTIONS <<<"
         )
 
-        llm_response = self.llm.generate(prompt)
-
-        result = LLMResponseParser.parse(llm_response)
-
-        acts = result.get("acts", [])
-        mappings = result.get("act_section_mapping", [])
-
-        return acts, mappings
-
-    def extract(self, pdf_path: str | Path) -> dict:
-
-        pdf_path = Path(pdf_path)
-
-        text, _ = self.ocr.process(pdf_path)
-
-        case_number = get_case_number_from_filename(pdf_path)
-
-
-        regex = RegexExtractor(text)
-
-        regex_result = regex.extract_all()
-
-        location_extractor = SurveyLocationExtractor(text)
-
-        survey_locations = location_extractor.extract(regex_result["survey_numbers"])
-
-        regex_result["survey_locations"] = survey_locations
-
-        regex_result["sections"] = Normalizer.normalize_sections(
-            regex_result["sections"]
+        section_extractor = SectionExtractor(
+            text
         )
 
-        regex_result["case_number"] = case_number
+        sections = section_extractor.extract()
 
-        print("=" * 80)
-        print("RAW SURVEY NUMBERS")
-        print("=" * 80)
+        sections = Normalizer.normalize_sections(
+            sections
+        )
 
-        for survey in regex_result["survey_numbers"]:
-            print(repr(survey))
+        # ---------------------------------------------------------
+        # 2. Extract Survey Numbers
+        # ---------------------------------------------------------
 
-        chunks = self.chunker.split(text)
+        print(
+            ">>> EXTRACTING SURVEY NUMBERS <<<"
+        )
 
-        all_acts = []
-        all_mappings = []
+        survey_extractor = SurveyExtractor(
+            text
+        )
 
-        print(f"\nTotal Chunks : {len(chunks)}\n")
+        survey_numbers = survey_extractor.extract()
 
-        MAX_WORKERS = 4
-
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-
-            futures = {
-                executor.submit(
-                    self._extract_acts_from_chunk,
-                    chunk,
-                    regex_result["sections"],
-                ): index
-
-                for index, chunk in enumerate(chunks, start=1)
-            }
-
-            for future in as_completed(futures):
-
-                chunk_index = futures[future]
-
-                try:
-                    acts, mappings = future.result()
-
-                    all_acts.extend(acts)
-                    all_mappings.extend(mappings)
-
-                    print(f"Chunk {chunk_index} Completed")
-
-                except Exception as e:
-
-                    print(f"Chunk {chunk_index} Failed")
-
-                    print(e)
-
-
-
-        llm_result = {
-            "acts": Normalizer.normalize_acts(all_acts),
-            "act_section_mapping": Normalizer.normalize_act_section_mapping(
-                all_mappings
-            ),
-        }
-
+        # ---------------------------------------------------------
+        # 3. Assemble Result
+        # ---------------------------------------------------------
 
         final_result = {
+
             "case_number": case_number,
-            "survey_numbers": regex_result["survey_numbers"],
-            "survey_locations": regex_result["survey_locations"],
-            "sections": regex_result["sections"],
-            "acts": llm_result["acts"],
-            "act_section_mapping": llm_result["act_section_mapping"],
+
+            "survey_numbers": survey_numbers,
+
+            "survey_locations": [],
+
+            "sections": sections,
+
+            "acts": [],
+
+            "act_section_mapping": [],
+
             "primary_act": None,
         }
 
-        print("=" * 80)
-        print("SURVEY LOCATIONS BEFORE VALIDATOR")
-        print("=" * 80)
-        print(regex_result["survey_locations"])
+        # ---------------------------------------------------------
+        # 4. Validate
+        # ---------------------------------------------------------
 
-        final_result = Validator.validate(final_result)
+        final_result = Validator.validate(
+            final_result
+        )
 
-        print("=" * 80)
-        print("FINAL SURVEY NUMBERS")
-        print("=" * 80)
+        # ---------------------------------------------------------
+        # 5. Print Result
+        # ---------------------------------------------------------
 
-        for survey in final_result["survey_numbers"]:
-            print(repr(survey))
+        print(
+            "=" * 80
+        )
 
-        print("=" * 80)
-        print("FINAL RESULT")
-        print("=" * 80)
+        print(
+            "FINAL RESULT"
+        )
 
-        import json
+        print(
+            "=" * 80
+        )
 
-        print(json.dumps(final_result, indent=4))
+        print(
+            json.dumps(
+                final_result,
+                indent=4,
+            )
+        )
 
         return final_result
+
+    def extract_from_file(
+        self,
+        txt_path: str | Path,
+    ) -> dict:
+
+        txt_path = Path(
+            txt_path
+        )
+
+        text = txt_path.read_text(
+            encoding="utf-8"
+        )
+
+        case_number = (
+            txt_path.stem
+        )
+
+        return self.extract(
+            text=text,
+            case_number=case_number,
+        )

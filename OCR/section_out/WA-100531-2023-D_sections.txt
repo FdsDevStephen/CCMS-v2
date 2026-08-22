@@ -1,0 +1,103 @@
+================================================================================
+SYNOPSIS
+================================================================================
+
+. 1. 24.08.2014 The Petitioner made application to the
+Respondent No.2 seeking grant of land in| ©
+oo a - question in his favour through Proper
+nce . we | Channel. 0... Soke Oe
+2. 13.05.2017 | The Petitioner herein again. made -
+| -| application to Respondent No.4 requesting |
+“| to grant landin herfavour. |
+;
+| 3. | 26.12.2017 Being aggrieved by the in action on behalf of .
+. appellants, the Respondents herein
+, . ' | approached this Hon’ble Court by filing in
+| W.P.No.100462/2022.
+2- .
+4. , 24.02.2023 | After appreciation of the fact on behalf of |.
+both the Appellants of as well as Respondent
+| the Hon’ble learned single Judge was
+pleased to allow the petition directing the|
+Appellant No.2 to grant land either in
+RS.No.190 of Savadatti village and Sy.No.73
+. and 67 of Nasalapur village Raibag Taluk.
+10. | .08.2023 Being aggrieved by the said order passed by
+| the Learned Single Judge in Writ Petition .
+| No.100462/2022, the appellants herein have
+| So, filed the above appeal. _ .
+
+================================================================================
+BRIEF FACTS OF THE CASE
+================================================================================
+
+. That the Petitioner is an ex-servicemen who has rendered
+_ service in Indian Army and being a land less solder made an
+| application dated 24.08.2014 to the 2°? Respondent seeking
+grant of land and inview of the non consideration of the same
+has made another correspondence seeking the same relief on
+13.08.2017. Inview of the non consideration: of the claim, the
+Respondent approach this Hon’ble Court seeks writ of mandamus .
+for grant. of 5 Acres of land in RS.No.190 of Savadatti village,
+; Raibag Taluk and sought for other consequently relief in -
+a W.P.No.100462/2022. After issuance of notice to the appellants
+| herein inspite of having filed a detailed Statement of Objections
+| - and denying the claim of the Respondent and sought for
+dismissal of the petition. But however the learned Single after
+| appreciating the facts was pleased to allow the petition directing
+the 2"? Respondent to grant land either in RS.No.190 of
+| Savadatti or in Sy.No.73 and 67 of Nasalapur village and also -
+- . made an observation that, the conduct of the Appellants No.2 in
+mo passing an order to re-classifying the land during the pendency .
+: | of the Writ Petition is a clear ‘attempt to ensure that ex- ,
+servicemen who had served the country are denied their
+| statutory entitlement for grant of land and imposed the cost of
+Rs.25,000/- to be paid to the Respondent by order dated |
+24.02.2023. The appellants aggrieved by the order passed by the ©
+Learned Single Judge have left with no. other alternative and
+; - efficacious remedy has approached this Hon'ble Court by filing | :
+present Writ Appeal. | |
+. Place : Dharwad :
+
+================================================================================
+PRAYER
+================================================================================
+
+_ WHEREFORE, the. Appellants-State prays that this Hon’ble .
+Court may be pleased to:
+: - ) (a) Call for records; - . .
+|
+: - (b) Quash the Judgment dated 24.02.2023
+passed by the learned Single Judge in
+. W.P. No.100462/2022 (KLR-LG); .
+, AND |
+(c) Grant such other reliefs as this Hon’ble
+Court deems fit in the facts and
+circumstances of the case, in the interest ;
+; , of justice and equity. . .
+a - _ List of Authorities . Oo
+-Nil- . ;
+_ Place : Dharwad. | _
+Date : .08.2023
+| (V.S. KALASURMATH)
+
+================================================================================
+PROCESS INFORMATION
+================================================================================
+
+PDF: C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\uploads\WA-100531-2023-D.pdf
+Total Pages: 166
+Pages Scanned for Discovery: 30
+
+synopsis: {'section': 'synopsis', 'page': 5, 'score': 385.0, 'line': 'SYNOPSIS TABLE', 'kind': 'table'}
+brief_facts: {'section': 'brief_facts', 'page': 6, 'score': 245.0, 'line': 'SUBJECT IN BRIEF', 'kind': 'heading'}
+prayer: {'section': 'prayer', 'page': 15, 'score': 180, 'line': 'PRAYER', 'kind': 'heading'}
+
+synopsis range: 5-6
+brief_facts range: 6-7
+prayer range: 15-16
+
+fast_scan: 3.720 sec
+full_ocr: 2.898 sec
+extraction: 0.003 sec
+total: 6.687 sec
