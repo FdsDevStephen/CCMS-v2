@@ -75,6 +75,7 @@ desktop.ini
 # Data
 # ==========================================================
 uploads/
+results/
 section_output/
 test_output/
 ocr/
@@ -84,6 +85,13 @@ output_text/
 temp/
 tmp/
 *.tmp
+.streamlit_uploads/
+_profile_pipeline.py
+
+test_full_pipeline.py
+test.py
+testor.py
+test_embedding.py
 
 # ==========================================================
 # OCR Temporary Files

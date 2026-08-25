@@ -49,11 +49,9 @@ VALID_SECTION_PATTERN = re.compile(
     r"""
     ^
     (
-        Rule\s+\d+(?:-[A-Z]+)?(?:\(\d+[A-Z]?\))?
+        \d+[A-Z]{0,2}(?:\([A-Za-z0-9]{1,4}\))*
         |
-        \d+[A-Z]{0,2}(?:\(\d+[A-Z]?\))?
-        |
-        \d+-[A-Z](?:\(\d+\))?
+        \d+-[A-Z]{1,3}(?:\([A-Za-z0-9]{1,4}\))*
     )
     $
     """,
@@ -184,7 +182,7 @@ class Normalizer:
         section = normalize_parentheses(section)
 
         return finalize_section_text(section)
-    
+
     @staticmethod
     def normalize_survey_locations(locations: list[dict]) -> list[dict]:
         """Normalize and deduplicate Survey Number -> Location mappings."""
@@ -434,6 +432,7 @@ def is_valid_mapping_section(section: str) -> bool:
         return False
 
     return bool(VALID_SECTION_PATTERN.fullmatch(section))
+
 
 def clean_location_name(value: str | None) -> str | None:
     """Clean village, hobli, taluk, or district names."""

@@ -2,134 +2,321 @@ from __future__ import annotations
 
 import json
 import time
-
 from pathlib import Path
-
-import time
-
-start = time.perf_counter()
-
-print("1. Importing LegalExtractor...", flush=True)
-from extractor.extractor import LegalExtractor
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("2. Importing SurveyLocationExtractor...", flush=True)
-from extractor.survey_location import SurveyLocationExtractor
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("3. Importing LegalTextChunker...", flush=True)
-from RAG.chunker import LegalTextChunker
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("4. Importing EmbeddingModel...", flush=True)
-from RAG.embedding import EmbeddingModel
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("5. Importing LegalRetriever...", flush=True)
-from RAG.retriever import LegalRetriever
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("6. Importing HybridRetriever...", flush=True)
-from RAG.hybrid_retreiver import HybridRetriever
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("7. Importing QdrantVectorStore...", flush=True)
-from RAG.vector_store import QdrantVectorStore
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-start = time.perf_counter()
-
-print("8. Importing ActExtractor...", flush=True)
-from RAG.act_extractor import ActExtractor
-print(f"   Done: {time.perf_counter() - start:.2f}s", flush=True)
-
-print()
-print("=" * 60)
-print("ALL IMPORTS COMPLETE")
-print("=" * 60)
-
-
-# ==========================================================
-# CONFIG
-# ==========================================================
-
-TXT_PATH = Path(
-    r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\section_output\WP-14650-2021-B.txt"
-)
 
 
 # ==========================================================
 # TIMER
 # ==========================================================
 
+def stage_time(
+    label: str,
+    start: float,
+) -> None:
+    elapsed = time.perf_counter() - start
+
+    print(
+        f">>> {label}: {elapsed:.2f}s",
+        flush=True,
+    )
+
+
+# ==========================================================
+# IMPORTS
+# ==========================================================
+
+start = time.perf_counter()
+
+print(
+    "1. Importing OCRProcessor...",
+    flush=True,
+)
+
+from ocr_v2 import OCRProcessor
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "2. Importing LegalExtractor...",
+    flush=True,
+)
+
+from extractor.extractor import LegalExtractor
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "3. Importing SurveyLocationExtractor...",
+    flush=True,
+)
+
+from extractor.survey_location import (
+    SurveyLocationExtractor,
+)
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "4. Importing LegalTextChunker...",
+    flush=True,
+)
+
+from RAG.chunker import LegalTextChunker
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "5. Importing EmbeddingModel...",
+    flush=True,
+)
+
+from RAG.embedding import EmbeddingModel
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "6. Importing LegalRetriever...",
+    flush=True,
+)
+
+from RAG.retriever import LegalRetriever
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "7. Importing HybridRetriever...",
+    flush=True,
+)
+
+from RAG.hybrid_retreiver import (
+    HybridRetriever,
+)
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "8. Importing QdrantVectorStore...",
+    flush=True,
+)
+
+from RAG.vector_store import QdrantVectorStore
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+start = time.perf_counter()
+
+print(
+    "9. Importing ActExtractor...",
+    flush=True,
+)
+
+from RAG.act_extractor import ActExtractor
+
+print(
+    f"   Done: "
+    f"{time.perf_counter() - start:.2f}s",
+    flush=True,
+)
+
+
+print()
+print("=" * 70)
+print("ALL IMPORTS COMPLETE")
+print("=" * 70)
+
+
+# ==========================================================
+# CONFIG
+# ==========================================================
+
+PDF_PATH = Path(
+    r"c:\Users\steph\OneDrive\Desktop\data\KLR- LG Case Copy\WP-625-2023-B.pdf"
+)
+
+OUTPUT_FOLDER = Path(
+    r"C:\Users\steph\OneDrive\Desktop\CEG\CCMS v2\section_output"
+)
+
+TESSERACT_PATH = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
+
+
+# ==========================================================
+# PIPELINE TIMER
+# ==========================================================
+
 pipeline_start = time.perf_counter()
 
 
 # ==========================================================
-# 1. READ OCR TEXT
+# 1. OCR PROCESSING
 # ==========================================================
 
-if not TXT_PATH.exists():
+print()
+print("=" * 70)
+print("1. OCR PROCESSING")
+print("=" * 70)
+
+if not PDF_PATH.exists():
     raise FileNotFoundError(
-        f"Text file not found: {TXT_PATH}"
+        f"PDF file not found: {PDF_PATH}"
     )
 
-try:
-    text = TXT_PATH.read_text(
-        encoding="utf-8"
-    )
+stage_start = time.perf_counter()
 
-except UnicodeDecodeError:
+ocr_processor = OCRProcessor(
+    output_folder=OUTPUT_FOLDER,
+    tesseract_path=TESSERACT_PATH,
+    search_pages=30,
+    fast_dpi=150,
+    full_dpi=220,
+    max_workers=8,
+    page_start=2,
+    page_end=13,
+    prefer_text_layer=True,
+    denoise=True,
+)
 
-    try:
-        text = TXT_PATH.read_text(
-            encoding="cp1252"
-        )
+ocr_text, txt_path = (
+    ocr_processor.process(PDF_PATH)
+)
 
-    except UnicodeDecodeError:
+stage_time(
+    "OCR",
+    stage_start,
+)
 
-        text = TXT_PATH.read_text(
-            encoding="latin-1"
-        )
+print(
+    f"OCR text saved to: {txt_path}",
+    flush=True,
+)
 
-
-document_name = TXT_PATH.stem
+print(
+    f"OCR text length: "
+    f"{len(ocr_text):,} characters",
+    flush=True,
+)
 
 
 # ==========================================================
-# 2. EXTRACT CASE INFORMATION
+# 2. BASIC LEGAL EXTRACTION
 # ==========================================================
+
+print()
+print("=" * 70)
+print("2. LEGAL EXTRACTION")
+print("=" * 70)
+
+stage_start = time.perf_counter()
+
+document_name = PDF_PATH.stem
 
 legal_extractor = LegalExtractor()
 
 base_result = legal_extractor.extract(
-    text=text,
+    text=ocr_text,
     case_number=document_name,
 )
 
-print(">>> LEGAL EXTRACTION COMPLETE <<<", flush=True)
-print(">>> STARTING CHUNKING <<<", flush=True)
+stage_time(
+    "LEGAL EXTRACTION",
+    stage_start,
+)
+
 
 # ==========================================================
-# 3. CHUNK DOCUMENT
+# 3. LOAD BGE-M3 ONCE
 # ==========================================================
 
-chunker = LegalTextChunker()
+print()
+print("=" * 70)
+print("3. LOADING EMBEDDING MODEL")
+print("=" * 70)
+
+stage_start = time.perf_counter()
+
+embedding_model = EmbeddingModel()
+
+stage_time(
+    "BGE-M3 LOAD",
+    stage_start,
+)
+
+
+# ==========================================================
+# 4. CHUNK DOCUMENT
+# ==========================================================
+
+print()
+print("=" * 70)
+print("4. CHUNKING")
+print("=" * 70)
+
+stage_start = time.perf_counter()
+
+chunker = LegalTextChunker(
+    chunk_size=450,
+    overlap=50,
+    tokenizer=embedding_model.tokenizer,
+)
 
 chunks = chunker.chunk_file(
-    TXT_PATH
+    txt_path
 )
 
 if not chunks:
@@ -138,12 +325,27 @@ if not chunks:
         "Check LegalTextChunker section parsing."
     )
 
+stage_time(
+    "CHUNKING",
+    stage_start,
+)
+
+print(
+    f"Chunks created: {len(chunks)}",
+    flush=True,
+)
+
 
 # ==========================================================
-# 4. GENERATE EMBEDDINGS
+# 5. GENERATE EMBEDDINGS
 # ==========================================================
 
-embedding_model = EmbeddingModel()
+print()
+print("=" * 70)
+print("5. GENERATING EMBEDDINGS")
+print("=" * 70)
+
+stage_start = time.perf_counter()
 
 texts = [
     chunk["text"]
@@ -151,13 +353,32 @@ texts = [
 ]
 
 embeddings = embedding_model.encode(
-    texts
+    texts,
+    batch_size=12,
+)
+
+stage_time(
+    "EMBEDDINGS",
+    stage_start,
+)
+
+print(
+    f"Embedding shape: "
+    f"{embeddings.shape}",
+    flush=True,
 )
 
 
 # ==========================================================
-# 5. STORE DOCUMENT IN QDRANT
+# 6. STORE DOCUMENT IN QDRANT
 # ==========================================================
+
+print()
+print("=" * 70)
+print("6. QDRANT")
+print("=" * 70)
+
+stage_start = time.perf_counter()
 
 vector_store = QdrantVectorStore()
 
@@ -166,10 +387,22 @@ vector_store.insert(
     embeddings,
 )
 
+stage_time(
+    "QDRANT INSERT",
+    stage_start,
+)
+
 
 # ==========================================================
-# 6. SURVEY LOCATION EXTRACTION
+# 7. SURVEY LOCATION EXTRACTION
 # ==========================================================
+
+print()
+print("=" * 70)
+print("7. SURVEY LOCATION EXTRACTION")
+print("=" * 70)
+
+stage_start = time.perf_counter()
 
 survey_numbers = base_result[
     "survey_numbers"
@@ -179,7 +412,7 @@ if survey_numbers:
 
     location_extractor = (
         SurveyLocationExtractor(
-            text
+            ocr_text
         )
     )
 
@@ -193,26 +426,57 @@ else:
 
     survey_locations = []
 
-
 base_result[
     "survey_locations"
 ] = survey_locations
 
+stage_time(
+    "SURVEY LOCATION",
+    stage_start,
+)
+
 
 # ==========================================================
-# 7. ACT + SECTION EXTRACTION
+# 8. BUILD HYBRID RETRIEVER
 # ==========================================================
+
+print()
+print("=" * 70)
+print("8. BUILDING HYBRID RETRIEVER")
+print("=" * 70)
+
+stage_start = time.perf_counter()
+
+retriever = HybridRetriever(
+    vector_retriever=LegalRetriever(
+        embedding_model=embedding_model,
+    )
+)
+
+retriever.build_bm25(
+    chunks
+)
+
+stage_time(
+    "BM25 + HYBRID RETRIEVER",
+    stage_start,
+)
+
+
+# ==========================================================
+# 9. ACT + SECTION EXTRACTION
+# ==========================================================
+
+print()
+print("=" * 70)
+print("9. ACT + SECTION EXTRACTION")
+print("=" * 70)
+
+stage_start = time.perf_counter()
 
 act_extractor = ActExtractor(
     chunks,
-    retriever=HybridRetriever(
-        vector_retriever=LegalRetriever(
-            # Reuse the encoder built in step 4. A second bge-m3 is another
-            # 2.27 GB in fp32; on an 8 GB machine the forward pass on the
-            # second copy segfaults instead of raising MemoryError.
-            embedding_model=embedding_model,
-        )
-    ),
+    retriever=retriever,
 )
 
 act_result = act_extractor.extract(
@@ -221,31 +485,36 @@ act_result = act_extractor.extract(
     top_k=5,
 )
 
+stage_time(
+    "ACT EXTRACTION",
+    stage_start,
+)
+
 
 # ==========================================================
-# 8. ADD ACT RESULT
+# 10. ADD ACT RESULT
 # ==========================================================
 
 base_result["acts"] = act_result.get(
     "acts",
-    []
+    [],
 )
 
 base_result["sections"] = act_result.get(
     "sections",
-    []
+    base_result["sections"],
 )
 
 base_result[
     "act_section_mapping"
 ] = act_result.get(
     "act_section_mapping",
-    []
+    [],
 )
 
 
 # ==========================================================
-# 9. TOTAL PIPELINE TIME
+# 11. TOTAL PIPELINE TIME
 # ==========================================================
 
 pipeline_end = time.perf_counter()
@@ -256,13 +525,12 @@ total_time = (
 
 
 # ==========================================================
-# 10. FINAL OUTPUT ONLY
+# 12. FINAL OUTPUT
 # ==========================================================
 
-print("\n" + "=" * 80)
-
+print()
+print("=" * 80)
 print("FINAL OUTPUT")
-
 print("=" * 80)
 
 print(
