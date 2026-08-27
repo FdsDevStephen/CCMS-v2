@@ -108,3 +108,8 @@ test_embedding.py
 .cache/
 huggingface/
 hf_cache/
+
+
+ccms-source.zip
+
+structure.txt

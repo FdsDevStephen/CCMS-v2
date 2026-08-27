@@ -4,995 +4,636 @@ import os
 import re
 import tempfile
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from time import perf_counter
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import cv2
+import fitz
 import numpy as np
 import pytesseract
-
-from pdf2image import convert_from_path
-from rapidfuzz.fuzz import ratio
-
-try:
-    from pypdf import PdfReader
-except ImportError:
-    PdfReader = None
 
 
 # ==========================================================
 # CONFIG
 # ==========================================================
 
-DEFAULT_OUTPUT_DIR = Path("section_output")
+@dataclass(frozen=True)
+class OCRConfig:
+    """
+    Configuration for whole-document OCR.
 
-DEFAULT_POPPLER_PATH = (
-    r"C:\Users\steph\.cache\codex-runtimes"
-    r"\codex-primary-runtime"
-    r"\dependencies\native\poppler\Library\bin"
-)
+    Every page of the uploaded PDF is processed.
+    There is no fast scan, page search, section detection,
+    Prayer detection, or selective OCR.
+    """
 
-SEARCH_PAGES = 30
+    # ----- OCR -----
 
-PAGE_START = 2
-PAGE_END = 13
+    dpi: int = 220
 
-FAST_DPI = 80
-FULL_DPI = 300
+    # Tesseract page segmentation mode.
+    # 6 = Assume a single uniform block of text.
+    psm: int = 6
 
-MAX_WORKERS = min(
-    8,
-    os.cpu_count() or 4,
-)
+    # Tesseract language.
+    language: str = "eng"
 
+    # ----- Preprocessing -----
 
-# ==========================================================
-# DATA
-# ==========================================================
+    denoise: bool = True
 
-@dataclass
-class Candidate:
-    section: str
-    page: int
-    score: float
-    line: str
-    kind: str
+    # ----- Concurrency -----
+
+    max_workers: int = field(
+        default_factory=lambda: min(8, os.cpu_count() or 4)
+    )
 
 
 # ==========================================================
 # NORMALIZATION
 # ==========================================================
 
-def normalize(
-    text: str,
-) -> str:
-
-    return " ".join(
-        text.upper().split()
-    )
+def normalize(text: str) -> str:
+    return " ".join(text.upper().split())
 
 
-def compact(
-    text: str,
-) -> str:
+def clean_ocr_text(text: str) -> str:
+    """
+    Clean the COMPLETE OCR output.
 
-    return re.sub(
-        r"[^A-Z0-9]",
-        "",
-        normalize(text),
-    )
+    OCR flow:
 
+        OCR ALL PAGES
+             ↓
+        combine all pages
+             ↓
+        clean_ocr_text()
+             ↓
+        final document text
 
-# ==========================================================
-# BASIC HELPERS
-# ==========================================================
+    This does NOT summarize or paraphrase the document.
+    """
 
-def clean_lines(
-    text: str,
-) -> list[str]:
+    if not text:
+        return ""
 
-    return [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip()
-    ]
+    # ======================================================
+    # 1. NORMALIZE LINE ENDINGS
+    # ======================================================
 
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
 
-def is_new_document(
-    line: str,
-) -> bool:
+    lines = []
 
-    normalized = normalize(line)
+    for raw_line in text.split("\n"):
 
-    return (
-        normalized.startswith(
-            "AFFIDAVIT"
+        line = raw_line.strip()
+
+        if not line:
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
+
+        # ==================================================
+        # 2. REMOVE TABLE / SCAN ARTIFACTS
+        # ==================================================
+
+        # Remove vertical table borders.
+        line = re.sub(r"[|¦]", " ", line)
+
+        # Remove long horizontal OCR lines.
+        line = re.sub(r"[-_=]{4,}", " ", line)
+        line = re.sub(r"_{3,}", " ", line)
+
+        # Remove obvious decorative OCR symbols.
+        line = re.sub(
+            r"(?<!\w)[*@#~`^°¢£€©®•·]+(?!\w)",
+            " ",
+            line,
         )
-        or normalized.startswith(
-            "VERIFYING AFFIDAVIT"
-        )
-        or (
-            normalized.startswith(
-                "IN THE HIGH COURT"
+
+        # Remove isolated backslashes.
+        line = re.sub(r"(?<!\w)\\(?!\w)", " ", line)
+
+        # ==================================================
+        # 3. HIGH-CONFIDENCE OCR CORRECTIONS
+        # ==================================================
+
+        corrections = {
+            # Court
+            r"\bCORT\b": "COURT",
+            r"\bCOUT\b": "COURT",
+            r"\bCOORT\b": "COURT",
+
+            # Karnataka
+            r"\bKamataka\b": "Karnataka",
+            r"\bKarnatake\b": "Karnataka",
+
+            # Common OCR errors
+            r"\bfram\b": "from",
+            r"\bfrorm\b": "from",
+            r"\bforma!\b": "formal",
+            r"\brnarked\b": "marked",
+            r"\bmace\b": "made",
+            r"\bthrougn\b": "through",
+
+            # Legal words
+            r"\bpetitloner\b": "petitioner",
+            r"\bPetitloner\b": "Petitioner",
+            r"\bpetitlon\b": "petition",
+            r"\brespondant\b": "respondent",
+
+            r"\bGommissioner\b": "Commissioner",
+            r"\bCommisioner\b": "Commissioner",
+            r"\bCommissloner\b": "Commissioner",
+
+            r"\bAsslstant\b": "Assistant",
+            r"\bReyenue\b": "Revenue",
+
+            r"\bGovemment\b": "Government",
+            r"\bgoverment\b": "government",
+
+            r"\bappllcation\b": "application",
+            r"\bapproprlate\b": "appropriate",
+            r"\bopportunlty\b": "opportunity",
+
+            r"\bunauthorlzed\b": "unauthorized",
+            r"\bregularizatlon\b": "regularization",
+            r"\brepresentatlon\b": "representation",
+            r"\bcancellatlon\b": "cancellation",
+
+            r"\bproceedlng\b": "proceeding",
+            r"\bproceedlngs\b": "proceedings",
+
+            r"\bnotlce\b": "notice",
+
+            r"\bOrignial\b": "Original",
+            r"\bAmnexure\b": "Annexure",
+            r"\bANNEXCURE\b": "ANNEXURE",
+
+            r"\bAlfidavil\b": "Affidavit",
+            r"\battidavit\b": "affidavit",
+            r"\bVeritying\b": "Verifying",
+            r"\bMemorand\b": "Memorandum",
+
+            # Other recurring OCR errors
+            r"\bLatter\b": "Letter",
+            r"\bDio\b": "D/o",
+            r"\bWio\b": "W/o",
+        }
+
+        for pattern, replacement in corrections.items():
+            line = re.sub(
+                pattern,
+                replacement,
+                line,
             )
-            and (
-                "BETWEEN" in normalized
-                or "WRIT PETITION" in normalized
-                or "WRIT APPEAL" in normalized
+
+        # ==================================================
+        # 4. CONTEXT-SPECIFIC LEGAL CORRECTIONS
+        # ==================================================
+
+        # HIGH CORT OF KARNATAKA → HIGH COURT
+        line = re.sub(
+            r"\bHIGH\s+CORT\b",
+            "HIGH COURT",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Farr/Far No.53 → Form No.53
+        line = re.sub(
+            r"\bFarr\s+No\.",
+            "Form No.",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        line = re.sub(
+            r"\bFar\s+No\.",
+            "Form No.",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Rule 108 D (3)
+        line = re.sub(
+            r"\bRule\s+108\s+D\s*\(\s*3\s*\)",
+            "Rule 108-D(3)",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Rule 108-D-3
+        line = re.sub(
+            r"\bRule\s+108-D-3\b",
+            "Rule 108-D(3)",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # ==================================================
+        # 5. WHITESPACE
+        # ==================================================
+
+        line = re.sub(r"[ \t]+", " ", line)
+
+        # Space before punctuation.
+        line = re.sub(
+            r"\s+([,.;:!?])",
+            r"\1",
+            line,
+        )
+
+        # Missing space after punctuation.
+        line = re.sub(
+            r"([,.;:!?])(?=[A-Za-z])",
+            r"\1 ",
+            line,
+        )
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        # ==================================================
+        # 6. REMOVE OBVIOUS GARBAGE LINES
+        # ==================================================
+
+        # Standalone page number.
+        if re.fullmatch(r"\d{1,3}", line):
+            continue
+
+        # Standalone punctuation/symbols.
+        if re.fullmatch(r"[\W_]+", line):
+            continue
+
+        # Tiny OCR garbage.
+        if re.fullmatch(r"[A-Za-z]{1,2}", line):
+            if line.upper() not in {
+                "IN",
+                "OF",
+                "TO",
+                "BY",
+                "OR",
+                "NO",
+                "RS",
+                "MR",
+                "MS",
+                "DR",
+                "VS",
+                "WP",
+                "IA",
+                "RA",
+                "AND",
+                "AS",
+                "IS",
+                "ON",
+                "AT",
+                "A",
+                "I",
+            }:
+                continue
+
+        lines.append(line)
+
+    # ======================================================
+    # 7. REBUILD BROKEN OCR LINES
+    # ======================================================
+
+    final_lines = []
+
+    for line in lines:
+
+        if not line:
+            if final_lines and final_lines[-1] != "":
+                final_lines.append("")
+            continue
+
+        # Never merge headings.
+        is_heading = (
+            line.isupper()
+            and len(line) <= 100
+        )
+
+        # Never merge numbered legal paragraphs.
+        is_numbered = bool(
+            re.match(
+                r"^(?:\d+[.)]|\([A-Za-z0-9]+\)|[A-Za-z][.)])\s+",
+                line,
             )
         )
-    )
-
-
-def is_place_heading(
-    line: str,
-) -> bool:
-
-    normalized = normalize(line)
-
-    return (
-        normalized == "PLACE"
-        or normalized.startswith("PLACE:")
-        or normalized.startswith("PLACE ")
-    )
-
-
-# ==========================================================
-# GROUNDS
-# ==========================================================
-
-GROUNDS_PATTERNS = [
-    "GROUNDS",
-    "SALIENT GROUNDS",
-    "GROUNDS OF CHALLENGE",
-    "GROUNDS FOR INTERIM RELIEF",
-    "GROUNDS FOR INTERIM PRAYER",
-]
-
-
-def is_grounds_heading(
-    line: str,
-) -> bool:
-
-    normalized = normalize(line)
-
-    for target in GROUNDS_PATTERNS:
-
-        if normalized == target:
-            return True
 
         if (
-            len(normalized) <= 90
-            and ratio(
-                normalized,
-                target,
-            ) >= 85
+            final_lines
+            and final_lines[-1]
+            and not is_heading
+            and not is_numbered
         ):
-            return True
 
-    return False
+            previous = final_lines[-1]
+
+            previous_is_heading = (
+                previous.isupper()
+                and len(previous) <= 100
+            )
+
+            if not previous_is_heading:
+
+                # Join obvious wrapped sentences.
+                if (
+                    not previous.endswith(
+                        (".", ":", ";", "?", "!")
+                    )
+                    and not line.startswith(
+                        (
+                            "ANNEXURE",
+                            "INDEX",
+                            "SYNOPSIS",
+                            "WHEREFORE",
+                            "BENGALURU",
+                            "DATE:",
+                            "ADVOCATE",
+                            "BETWEEN:",
+                            "AND:",
+                        )
+                    )
+                ):
+                    final_lines[-1] = (
+                        previous.rstrip()
+                        + " "
+                        + line.lstrip()
+                    )
+                    continue
+
+        final_lines.append(line)
+
+    # ======================================================
+    # 8. FINAL BLANK-LINE CLEANUP
+    # ======================================================
+
+    output = []
+
+    for line in final_lines:
+
+        if not line.strip():
+
+            if output and output[-1] != "":
+                output.append("")
+
+        else:
+            output.append(line.rstrip())
+
+    while output and not output[0].strip():
+        output.pop(0)
+
+    while output and not output[-1].strip():
+        output.pop()
+
+    return "\n".join(output)
 
 
 # ==========================================================
 # PDF PAGE COUNT
 # ==========================================================
 
-def get_total_pages(
+def get_total_pages(pdf_path: Path) -> int:
+    """
+    Get the total number of pages in the PDF.
+    """
+
+    document = fitz.open(str(pdf_path))
+
+    try:
+        return document.page_count
+    finally:
+        document.close()
+
+
+# ==========================================================
+# RENDER PAGE
+# ==========================================================
+
+def render_page_gray(
     pdf_path: Path,
-) -> int:
+    page_number: int,
+    dpi: int,
+) -> np.ndarray:
+    """
+    Render ONE PDF page as grayscale.
+    """
 
-    if PdfReader is not None:
-
-        try:
-            return len(
-                PdfReader(
-                    str(pdf_path)
-                ).pages
-            )
-
-        except Exception:
-            pass
+    document = fitz.open(str(pdf_path))
 
     try:
 
-        import fitz
-
-        document = fitz.open(
-            str(pdf_path)
+        pixmap = document[page_number - 1].get_pixmap(
+            dpi=dpi,
+            colorspace=fitz.csGRAY,
+            alpha=False,
         )
 
-        try:
-            return document.page_count
+        return np.frombuffer(
+            pixmap.samples,
+            dtype=np.uint8,
+        ).reshape(
+            pixmap.height,
+            pixmap.width,
+        )
 
-        finally:
-            document.close()
-
-    except Exception as exc:
-
-        raise RuntimeError(
-            "Unable to determine PDF page count."
-        ) from exc
+    finally:
+        document.close()
 
 
 # ==========================================================
-# OCR
+# TESSERACT OCR
 # ==========================================================
 
-def ocr_image(
-    image: np.ndarray,
+def ocr_gray(
+    gray: np.ndarray,
     psm: int,
+    dpi: int,
+    language: str,
 ) -> str:
-
-    gray = cv2.cvtColor(
-        image,
-        cv2.COLOR_RGB2GRAY,
-    )
+    """
+    Run Tesseract on a grayscale page.
+    """
 
     return pytesseract.image_to_string(
         gray,
-        lang="eng",
-        config=f"--oem 3 --psm {psm}",
-    )
-
-
-def fast_ocr_page(
-    args,
-):
-
-    page, image = args
-
-    return (
-        page,
-        ocr_image(
-            np.array(image),
-            11,
+        lang=language,
+        config=(
+            f"--oem 3 "
+            f"--psm {psm} "
+            f"-c user_defined_dpi={dpi}"
         ),
     )
 
 
-def full_ocr_page(
-    args,
-):
-
-    page, image = args
-
-    image_array = np.array(
-        image
-    )
-
-    gray = cv2.cvtColor(
-        image_array,
-        cv2.COLOR_RGB2GRAY,
-    )
-
-    gray = cv2.medianBlur(
-        gray,
-        3,
-    )
-
-    text = pytesseract.image_to_string(
-        gray,
-        lang="eng",
-        config="--oem 3 --psm 6",
-    )
-
-    return (
-        page,
-        text,
-    )
-
-
 # ==========================================================
-# FAST OCR
-# SEARCH FIRST 30 PAGES
+# OCR ONE PAGE
 # ==========================================================
 
-def fast_scan(
+def ocr_page(
     pdf_path: Path,
-):
+    page_number: int,
+    cfg: OCRConfig,
+) -> tuple[int, str]:
+    """
+    OCR exactly ONE page.
 
-    start = perf_counter()
+    Every page in the document comes through this function.
+    """
 
-    total_pages = get_total_pages(
-        pdf_path
-    )
-
-    scan_pages = min(
-        SEARCH_PAGES,
-        total_pages,
-    )
-
-    print(
-        f"\nFast OCR: scanning pages "
-        f"1-{scan_pages}..."
-    )
-
-    images = convert_from_path(
+    gray = render_page_gray(
         pdf_path,
-        dpi=FAST_DPI,
-        poppler_path=POPPLER_PATH,
-        first_page=1,
-        last_page=scan_pages,
-        thread_count=MAX_WORKERS,
+        page_number,
+        cfg.dpi,
     )
 
-    jobs = [
-        (
-            page,
-            image,
-        )
-        for page, image in enumerate(
-            images,
-            start=1,
-        )
-    ]
+    if cfg.denoise:
+        gray = cv2.medianBlur(gray, 3)
 
-    page_text = {}
-
-    with ThreadPoolExecutor(
-        max_workers=MAX_WORKERS
-    ) as executor:
-
-        for page, text in executor.map(
-            fast_ocr_page,
-            jobs,
-        ):
-
-            page_text[page] = text
-
-    elapsed = (
-        perf_counter()
-        - start
+    text = ocr_gray(
+        gray,
+        cfg.psm,
+        cfg.dpi,
+        cfg.language,
     )
 
-    return (
-        page_text,
-        total_pages,
-        elapsed,
-    )
+    return page_number, text
 
 
 # ==========================================================
-# MERGE OCR RANGES
+# OCR ALL PAGES
 # ==========================================================
 
-def merge_ranges(
-    ranges: list[tuple[int, int]],
-) -> list[tuple[int, int]]:
-
-    if not ranges:
-        return []
-
-    sorted_ranges = sorted(
-        (
-            min(start, end),
-            max(start, end),
-        )
-        for start, end in ranges
-    )
-
-    merged = [
-        sorted_ranges[0]
-    ]
-
-    for start, end in sorted_ranges[1:]:
-
-        previous_start, previous_end = (
-            merged[-1]
-        )
-
-        if start <= previous_end + 1:
-
-            merged[-1] = (
-                previous_start,
-                max(
-                    previous_end,
-                    end,
-                ),
-            )
-
-        else:
-
-            merged.append(
-                (
-                    start,
-                    end,
-                )
-            )
-
-    return merged
-
-
-# ==========================================================
-# FULL OCR
-# ==========================================================
-
-def full_ocr_ranges(
+def ocr_document(
     pdf_path: Path,
-    ranges: list[tuple[int, int]],
+    cfg: OCRConfig,
 ) -> dict[int, str]:
+    """
+    OCR EVERY PAGE of the document.
+
+    There is no page selection.
+
+    Example:
+
+        50-page PDF
+             ↓
+        pages = [1, 2, 3, ..., 50]
+             ↓
+        OCR all 50 pages
+    """
+
+    total_pages = get_total_pages(pdf_path)
+
+    print()
+    print("=" * 70)
+    print("WHOLE DOCUMENT OCR")
+    print("=" * 70)
+    print(f"PDF: {pdf_path.name}")
+    print(f"Total pages: {total_pages}")
+    print(f"DPI: {cfg.dpi}")
+    print(f"PSM: {cfg.psm}")
+    print(f"Workers: {cfg.max_workers}")
+    print("=" * 70)
+    print()
+
+    if total_pages == 0:
+        return {}
+
+    pages = list(range(1, total_pages + 1))
 
     page_text: dict[int, str] = {}
 
-    merged_ranges = merge_ranges(
-        ranges
-    )
+    start = perf_counter()
 
-    print(
-        f"\nFull OCR ranges: "
-        f"{merged_ranges}"
-    )
+    with ThreadPoolExecutor(
+        max_workers=cfg.max_workers
+    ) as executor:
 
-    for start_page, end_page in merged_ranges:
-
-        print(
-            f"Full OCR: pages "
-            f"{start_page}-{end_page}..."
-        )
-
-        images = convert_from_path(
-            pdf_path,
-            dpi=FULL_DPI,
-            poppler_path=POPPLER_PATH,
-            first_page=start_page,
-            last_page=end_page,
-            thread_count=MAX_WORKERS,
-        )
-
-        jobs = [
-            (
+        futures = {
+            executor.submit(
+                ocr_page,
+                pdf_path,
                 page,
-                image,
-            )
-            for page, image in enumerate(
-                images,
-                start=start_page,
-            )
-        ]
+                cfg,
+            ): page
+            for page in pages
+        }
 
-        with ThreadPoolExecutor(
-            max_workers=MAX_WORKERS
-        ) as executor:
+        completed = 0
 
-            for page, text in executor.map(
-                full_ocr_page,
-                jobs,
-            ):
+        for future in as_completed(futures):
 
-                page_text[page] = text
+            page = futures[future]
+
+            try:
+
+                page_number, text = future.result()
+
+                page_text[page_number] = text
+
+                completed += 1
+
+                print(
+                    f"  OCR page {page_number}/{total_pages}"
+                    f"  ({completed}/{total_pages})"
+                )
+
+            except Exception as exc:
+
+                print(
+                    f"  OCR FAILED on page {page}: {exc}"
+                )
+
+                # Keep the page in the result so that the
+                # document ordering is preserved.
+                page_text[page] = ""
+
+    elapsed = perf_counter() - start
+
+    print()
+    print(
+        f"OCR complete: {total_pages} page(s) "
+        f"in {elapsed:.2f}s"
+    )
 
     return page_text
 
 
 # ==========================================================
-# INTERIM PRAYER
+# COMBINE ALL PAGES
 # ==========================================================
 
-def is_interim_prayer_marker(
-    line: str,
-) -> bool:
-
-    normalized = normalize(line)
-
-    if not normalized:
-        return False
-
-    if (
-        "GROUNDS FOR INTERIM PRAYER"
-        in normalized
-    ):
-        return False
-
-    stripped = re.sub(
-        r"^[\s\W]*(?:[0-9]{1,3}|[IVX]{1,5})[\s.\-:)]+",
-        "",
-        normalized,
-    )
-
-    compact_line = compact(
-        stripped
-    )
-
-    return compact_line in {
-        "INTERIMPRAYER",
-        "INTENIMPRAYER",
-        "INTERMPRAYER",
-        "INTERIMPRAYE",
-    }
-
-
-# ==========================================================
-# PRAYER HEADING
-# ==========================================================
-
-def is_prayer_heading(
-    line: str,
-) -> bool:
-
-    normalized = normalize(line)
-
-    if is_interim_prayer_marker(
-        line
-    ):
-        return False
-
-    if normalized == "PRAYER":
-        return True
-
-    stripped = re.sub(
-        r"^[\s\W]*(?:I|II|III|IV|V|VI|VII|VIII|IX|X)[\s.\-:]+",
-        "",
-        normalized,
-    )
-
-    if stripped == "PRAYER":
-        return True
-
-    return (
-        normalized.startswith(
-            "PRAYER "
-        )
-        and len(normalized) <= 40
-    )
-
-
-# ==========================================================
-# PRAYER PAGE SCORE
-# ==========================================================
-
-def prayer_page_score(
-    text: str,
-) -> float:
-
-    normalized = normalize(text)
-
-    score = 0.0
-
-    signals = [
-        ("WHEREFORE", 80),
-        ("MOST RESPECTFULLY PRAYS", 80),
-        ("MOST RESPECTFULLY PRAY", 65),
-        ("MAY BE PLEASED TO", 35),
-        ("WRIT, ORDER OR DIRECTION", 35),
-        ("PASS SUCH OTHER ORDERS", 30),
-        ("GRANT SUCH OTHER RELIEFS", 30),
-        (
-            "IN THE INTEREST OF JUSTICE AND EQUITY",
-            25,
-        ),
-    ]
-
-    for phrase, weight in signals:
-
-        if phrase in normalized:
-            score += weight
-
-    roman_items = len(
-        re.findall(
-            r"\(\s*(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\s*\)",
-            normalized,
-        )
-    )
-
-    score += min(
-        roman_items * 15,
-        75,
-    )
-
-    if (
-        "INTERIM PRAYER" in normalized
-        or "INTENIM PRAYER" in normalized
-        or "PENDING DISPOSAL" in normalized
-    ):
-        score -= 200
-
-    return score
-
-
-# ==========================================================
-# COLLECT CANDIDATES
-#
-# Prayer logic retained from the working implementation.
-# ==========================================================
-
-def collect_candidates(
+def combine_all_pages(
     page_text: dict[int, str],
-):
+) -> str:
+    """
+    Combine OCR text from page 1 through the final page.
 
-    candidates = {
-        "prayer": [],
-    }
+    Page boundaries are preserved with blank lines.
+    """
 
-    for page, text in page_text.items():
-
-        lines = clean_lines(text)
-
-        # --------------------------------------------------
-        # Prayer Heading
-        # --------------------------------------------------
-
-        for line in lines:
-
-            if is_prayer_heading(line):
-
-                candidates["prayer"].append(
-                    Candidate(
-                        "prayer",
-                        page,
-                        180,
-                        line,
-                        "heading",
-                    )
-                )
-
-        # --------------------------------------------------
-        # Prayer Body
-        # --------------------------------------------------
-
-        body_score = prayer_page_score(
-            text
-        )
-
-        if body_score >= 100:
-
-            candidates["prayer"].append(
-                Candidate(
-                    "prayer",
-                    page,
-                    body_score,
-                    "PRAYER BODY",
-                    "body",
-                )
-            )
-
-    # ------------------------------------------------------
-    # FALLBACK
-    #
-    # Sometimes fast OCR only recognizes WHEREFORE.
-    # WHEREFORE is a strong Prayer indicator.
-    # Only use this fallback if no normal Prayer
-    # candidate was found.
-    # ------------------------------------------------------
-
-    if not candidates["prayer"]:
-
-        for page, text in page_text.items():
-
-            normalized = normalize(text)
-
-            if (
-                "WHEREFORE" in normalized
-                and (
-                    "PRAYS" in normalized
-                    or "PRAY" in normalized
-                    or "PLEASED TO" in normalized
-                )
-            ):
-
-                candidates["prayer"].append(
-                    Candidate(
-                        "prayer",
-                        page,
-                        95,
-                        "PRAYER BODY FALLBACK",
-                        "body",
-                    )
-                )
-
-    return candidates
-
-
-# ==========================================================
-# SELECT PRAYER
-# ==========================================================
-
-def select_prayer(
-    candidates,
-    total_pages,
-):
-
-    valid = [
-        candidate
-        for candidate in candidates
-        if (
-            1
-            <= candidate.page
-            <= min(
-                SEARCH_PAGES,
-                total_pages,
-            )
-        )
-    ]
-
-    if not valid:
-        return None
-
-    # Prefer an actual Prayer heading.
-    headings = [
-        candidate
-        for candidate in valid
-        if candidate.kind == "heading"
-    ]
-
-    if headings:
-
-        return min(
-            headings,
-            key=lambda candidate: (
-                candidate.page,
-                -candidate.score,
-            ),
-        )
-
-    # If OCR missed the heading,
-    # fall back to Prayer body score.
-    body = [
-        candidate
-        for candidate in valid
-        if candidate.kind == "body"
-    ]
-
-    if body:
-
-        return min(
-            body,
-            key=lambda candidate: (
-                candidate.page,
-                -candidate.score,
-            ),
-        )
-
-    return None
-
-
-# ==========================================================
-# FIND PRAYER END
-#
-# Uses the same range-detection behavior.
-# ==========================================================
-
-def find_prayer_end(
-    page_text,
-    start_page,
-    total_pages,
-):
-
-    max_page = min(
-        SEARCH_PAGES,
-        total_pages,
-        start_page + 8,
-    )
-
-    for page in range(
-        start_page,
-        max_page + 1,
-    ):
-
-        lines = clean_lines(
-            page_text.get(
-                page,
-                "",
-            )
-        )
-
-        for line in lines:
-
-            if is_interim_prayer_marker(
-                line
-            ):
-                return page
-
-            if page > start_page:
-
-                if is_new_document(
-                    line
-                ):
-                    return page
-
-                if is_grounds_heading(
-                    line
-                ):
-                    return page
-
-    return min(
-        start_page + 1,
-        max_page,
-    )
-
-
-# ==========================================================
-# FIND PRAYER START
-# ==========================================================
-
-def find_section_start(
-    text: str,
-    section: str,
-):
-
-    lines = text.splitlines()
-
-    if section != "prayer":
-        return None
-
-    # ----------------------------------------------
-    # First try the actual Prayer heading.
-    # ----------------------------------------------
-
-    for index, line in enumerate(
-        lines
-    ):
-
-        if is_prayer_heading(
-            line
-        ):
-
-            return index + 1
-
-    # ----------------------------------------------
-    # If heading was missed by OCR,
-    # locate the Prayer body.
-    # ----------------------------------------------
-
-    for index, line in enumerate(
-        lines
-    ):
-
-        normalized = normalize(
-            line
-        )
-
-        if (
-            "WHEREFORE" in normalized
-            or "MOST RESPECTFULLY PRAY"
-            in normalized
-        ):
-
-            return index
-
-    return None
-
-
-# ==========================================================
-# EXTRACT FULL PRAYER
-# ==========================================================
-
-def extract_prayer(
-    text: str,
-):
-
-    lines = text.splitlines()
-
-    if not lines:
+    if not page_text:
         return ""
 
-    start = find_section_start(
-        text,
-        "prayer",
-    )
+    parts = []
 
-    if start is None:
-        return ""
+    for page_number in sorted(page_text):
 
-    collected = []
+        text = page_text.get(page_number, "").strip()
 
-    for index in range(
-        start,
-        len(lines),
-    ):
-
-        line = lines[index].strip()
-
-        if not line:
+        if not text:
             continue
 
-        normalized = normalize(
-            line
-        )
+        parts.append(text)
 
-        # ----------------------------------------------
-        # Prayer boundaries
-        # ----------------------------------------------
-
-        if is_interim_prayer_marker(
-            line
-        ):
-            break
-
-        if is_new_document(
-            line
-        ):
-            break
-
-        if is_grounds_heading(
-            line
-        ):
-            break
-
-        # ----------------------------------------------
-        # Footer boundaries
-        # ----------------------------------------------
-
-        if is_place_heading(
-            line
-        ):
-            break
-
-        if (
-            "ADVOCATE FOR" in normalized
-            or (
-                "ADVOCATE" in normalized
-                and any(
-                    token in normalized
-                    for token in [
-                        "PETITIONER",
-                        "PETITIONERS",
-                        "APPELLANT",
-                        "APPELLANTS",
-                        "RESPONDENT",
-                    ]
-                )
-            )
-        ):
-            break
-
-        # ----------------------------------------------
-        # Date / Dated footer
-        # ----------------------------------------------
-
-        if (
-            normalized.startswith("DATE")
-            or normalized.startswith("DATED")
-        ):
-
-            nearby = " ".join(
-                normalize(x)
-                for x in lines[
-                    index:min(
-                        index + 6,
-                        len(lines),
-                    )
-                ]
-            )
-
-            if (
-                "ADVOCATE" in nearby
-                or "ADDRESS FOR SERVICE"
-                in nearby
-            ):
-                break
-
-        collected.append(
-            line
-        )
-
-    return "\n".join(
-        collected
-    ).strip()
-
-
-# ==========================================================
-# PAGE TEXT HELPER
-# ==========================================================
-
-def combine_pages(
-    page_text: dict[int, str],
-    start_page: int,
-    end_page: int,
-) -> str:
-
-    return "\n".join(
-        page_text[page]
-        for page in sorted(
-            page_text
-        )
-        if (
-            start_page
-            <= page
-            <= end_page
-        )
-    ).strip()
+    return "\n\n".join(parts).strip()
 
 
 # ==========================================================
@@ -1001,323 +642,71 @@ def combine_pages(
 
 def process_document(
     pdf_path: Path,
-):
+    cfg: OCRConfig | None = None,
+) -> dict:
+    """
+    Process the ENTIRE PDF.
+
+    Pipeline:
+
+        PDF
+         ↓
+        Count pages
+         ↓
+        OCR page 1
+        OCR page 2
+        OCR page 3
+        ...
+        OCR last page
+         ↓
+        Combine all pages
+         ↓
+        Return complete OCR text
+    """
+
+    cfg = cfg or OCRConfig()
+
+    pdf_path = Path(pdf_path)
+
+    if not pdf_path.exists():
+        raise FileNotFoundError(
+            f"PDF file not found: {pdf_path}"
+        )
 
     total_start = perf_counter()
 
     # ======================================================
-    # STEP 1
-    # FAST OCR FIRST 30 PAGES
+    # OCR EVERY PAGE
     # ======================================================
 
-    (
-        fast_text,
-        total_pages,
-        fast_time,
-    ) = fast_scan(
-        pdf_path
+    page_text = ocr_document(
+        pdf_path,
+        cfg,
     )
 
     # ======================================================
-    # STEP 2
-    # FIND PRAYER
+    # COMBINE
     # ======================================================
 
-    candidates = collect_candidates(
-        fast_text
-    )
-
-    prayer = select_prayer(
-        candidates["prayer"],
-        total_pages,
-    )
+    raw_text = combine_all_pages(page_text)
 
     # ======================================================
-    # STEP 3
-    # FIND FULL PRAYER RANGE
+    # CLEAN COMPLETE DOCUMENT
     # ======================================================
 
-    prayer_range = None
+    cleaned_text = clean_ocr_text(raw_text)
 
-    if prayer:
-
-        prayer_end = find_prayer_end(
-            fast_text,
-            prayer.page,
-            total_pages,
-        )
-
-        prayer_range = (
-            prayer.page,
-            prayer_end,
-        )
-
-        print(
-            f"Prayer found: "
-            f"Page {prayer.page}"
-        )
-
-        print(
-            f"Prayer range: "
-            f"Pages {prayer.page}-{prayer_end}"
-        )
-
-    else:
-
-        print(
-            "Prayer NOT FOUND in first "
-            f"{min(SEARCH_PAGES, total_pages)} pages."
-        )
-
-    # ======================================================
-    # STEP 4
-    # FIXED PAGES 2-13
-    # ======================================================
-
-    page_2_to_13_end = min(
-        PAGE_END,
-        total_pages,
-    )
-
-    ranges = []
-
-    if total_pages >= PAGE_START:
-
-        ranges.append(
-            (
-                PAGE_START,
-                page_2_to_13_end,
-            )
-        )
-
-    # ======================================================
-    # STEP 5
-    # ADD FULL PRAYER RANGE
-    #
-    # If Prayer is inside Pages 2-13,
-    # merge_ranges() prevents duplicate OCR.
-    # ======================================================
-
-    if prayer_range:
-
-        ranges.append(
-            prayer_range
-        )
-
-    # ======================================================
-    # STEP 6
-    # FULL OCR
-    # ======================================================
-
-    full_start = perf_counter()
-
-    full_text_by_page = (
-        full_ocr_ranges(
-            pdf_path,
-            ranges,
-        )
-    )
-
-    full_time = (
-        perf_counter()
-        - full_start
-    )
-
-    # ======================================================
-    # STEP 7
-    # EXTRACT PAGES 2-13
-    # ======================================================
-
-    pages_2_to_13 = ""
-
-    if total_pages >= PAGE_START:
-
-        pages_2_to_13 = combine_pages(
-            full_text_by_page,
-            PAGE_START,
-            page_2_to_13_end,
-        )
-
-    # ======================================================
-    # STEP 8
-    # EXTRACT FULL PRAYER
-    # ======================================================
-
-    prayer_text = ""
-
-    if prayer_range:
-
-        prayer_start_page, prayer_end_page = (
-            prayer_range
-        )
-
-        prayer_full_text = combine_pages(
-            full_text_by_page,
-            prayer_start_page,
-            prayer_end_page,
-        )
-
-        prayer_text = extract_prayer(
-            prayer_full_text
-        )
-
-    # ======================================================
-    # TOTAL TIME
-    # ======================================================
-
-    total_time = (
-        perf_counter()
-        - total_start
-    )
+    total_time = perf_counter() - total_start
 
     return {
         "pdf": str(pdf_path),
-
-        "total_pages": total_pages,
-
-        "search_pages": min(
-            SEARCH_PAGES,
-            total_pages,
-        ),
-
-        "locations": {
-            "prayer": (
-                asdict(prayer)
-                if prayer
-                else None
-            ),
-        },
-
-        "ranges": {
-            "pages_2_to_13": (
-                {
-                    "start": PAGE_START,
-                    "end": page_2_to_13_end,
-                }
-                if total_pages >= PAGE_START
-                else None
-            ),
-
-            "prayer": (
-                {
-                    "start": prayer_range[0],
-                    "end": prayer_range[1],
-                }
-                if prayer_range
-                else None
-            ),
-        },
-
-        "sections": {
-            "pages_2_to_13": pages_2_to_13,
-            "prayer": prayer_text,
-        },
-
+        "total_pages": len(page_text),
+        "pages": page_text,
+        "text": cleaned_text,
         "timing": {
-            "fast_scan": round(
-                fast_time,
-                3,
-            ),
-
-            "full_ocr": round(
-                full_time,
-                3,
-            ),
-
-            "total": round(
-                total_time,
-                3,
-            ),
+            "total": round(total_time, 3),
         },
     }
-
-
-# ==========================================================
-# SAVE OUTPUT
-# ==========================================================
-
-def save_document_output(
-    pdf_path: Path,
-    result: dict,
-    output_dir: Path,
-):
-
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    output_path = (
-        output_dir
-        / f"{pdf_path.stem}.txt"
-    )
-
-    sections = result[
-        "sections"
-    ]
-
-    with output_path.open(
-        "w",
-        encoding="utf-8",
-    ) as file:
-
-        file.write(
-            "=" * 80
-        )
-
-        file.write(
-            "\nPAGES 2-13\n"
-        )
-
-        file.write(
-            "=" * 80
-        )
-
-        file.write(
-            "\n\n"
-        )
-
-        file.write(
-            sections.get(
-                "pages_2_to_13",
-                "",
-            )
-            or "NOT FOUND"
-        )
-
-        file.write(
-            "\n\n"
-        )
-
-        file.write(
-            "=" * 80
-        )
-
-        file.write(
-            "\nFULL PRAYER\n"
-        )
-
-        file.write(
-            "=" * 80
-        )
-
-        file.write(
-            "\n\n"
-        )
-
-        file.write(
-            sections.get(
-                "prayer",
-                "",
-            )
-            or "NOT FOUND"
-        )
-
-        file.write(
-            "\n\n"
-        )
-
-    return output_path
 
 
 # ==========================================================
@@ -1326,67 +715,61 @@ def save_document_output(
 
 class OCRProcessor:
     """
-    OCR Processor.
+    Whole-document OCR processor.
 
-    Pipeline:
+    Usage:
 
-        PDF
-          ↓
-        Fast OCR - first 30 pages
-          ↓
-        Find Prayer
-          ↓
-        Find complete Prayer range
-          ↓
-        Full OCR - Pages 2-13 + Prayer range
-          ↓
-        Extract Pages 2-13
-          ↓
-        Extract complete Prayer
+        processor = OCRProcessor(
+            tesseract_path=r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
+        )
+
+        text, output_path = processor.process(
+            "document.pdf"
+        )
+
+    OR for Streamlit uploads:
+
+        text = processor.process_bytes(
+            pdf_bytes,
+            "document.pdf"
+        )
+
+    Every page is OCR'd.
     """
 
     def __init__(
         self,
-        poppler_path: str,
-        output_folder: Path,
+        poppler_path: str | None = None,
+        output_folder: Path | str = "ocr_output",
         tesseract_path: str | None = None,
-        search_pages: int = 30,
-        fast_dpi: int = 80,
-        full_dpi: int = 300,
+        dpi: int = 220,
+        psm: int = 6,
+        language: str = "eng",
         max_workers: int | None = None,
+        denoise: bool = True,
     ) -> None:
 
-        self.poppler_path = (
-            poppler_path
-        )
+        # Kept for compatibility with your existing code.
+        # Poppler is NOT used.
+        self.poppler_path = poppler_path
 
         self.output_folder = Path(
             output_folder
         )
 
-        self.search_pages = (
-            search_pages
-        )
-
-        self.fast_dpi = (
-            fast_dpi
-        )
-
-        self.full_dpi = (
-            full_dpi
-        )
-
-        self.max_workers = (
-            max_workers
-            if max_workers is not None
-            else min(
-                8,
-                os.cpu_count() or 4,
-            )
+        self.cfg = OCRConfig(
+            dpi=dpi,
+            psm=psm,
+            language=language,
+            denoise=denoise,
+            **(
+                {"max_workers": max_workers}
+                if max_workers is not None
+                else {}
+            ),
         )
 
         if tesseract_path:
-
             pytesseract.pytesseract.tesseract_cmd = (
                 tesseract_path
             )
@@ -1397,108 +780,6 @@ class OCRProcessor:
         )
 
     # ======================================================
-    # CONFIGURE
-    # ======================================================
-
-    def _configure(
-        self,
-    ) -> None:
-
-        global POPPLER_PATH
-        global SEARCH_PAGES
-        global FAST_DPI
-        global FULL_DPI
-        global MAX_WORKERS
-
-        POPPLER_PATH = (
-            self.poppler_path
-        )
-
-        SEARCH_PAGES = (
-            self.search_pages
-        )
-
-        FAST_DPI = (
-            self.fast_dpi
-        )
-
-        FULL_DPI = (
-            self.full_dpi
-        )
-
-        MAX_WORKERS = (
-            self.max_workers
-        )
-
-    # ======================================================
-    # FORMAT OUTPUT
-    # ======================================================
-
-    def _format_output(
-        self,
-        result: dict,
-    ) -> str:
-
-        sections = result.get(
-            "sections",
-            {},
-        )
-
-        output = []
-
-        output.append(
-            "=" * 80
-        )
-
-        output.append(
-            "PAGES 2-13"
-        )
-
-        output.append(
-            "=" * 80
-        )
-
-        output.append("")
-
-        output.append(
-            sections.get(
-                "pages_2_to_13",
-                "",
-            )
-            or "NOT FOUND"
-        )
-
-        output.append("")
-
-        output.append(
-            "=" * 80
-        )
-
-        output.append(
-            "FULL PRAYER"
-        )
-
-        output.append(
-            "=" * 80
-        )
-
-        output.append("")
-
-        output.append(
-            sections.get(
-                "prayer",
-                "",
-            )
-            or "NOT FOUND"
-        )
-
-        output.append("")
-
-        return "\n".join(
-            output
-        ).strip()
-
-    # ======================================================
     # SAVE TEXT
     # ======================================================
 
@@ -1507,14 +788,15 @@ class OCRProcessor:
         pdf_path: str | Path,
         text: str,
     ) -> Path:
+        """
+        Save complete OCR text as .txt.
+        """
 
-        pdf_path = Path(
-            pdf_path
-        )
+        stem = Path(pdf_path).stem or "document"
 
         output_path = (
             self.output_folder
-            / f"{pdf_path.stem}.txt"
+            / f"{stem}.txt"
         )
 
         output_path.write_text(
@@ -1525,61 +807,100 @@ class OCRProcessor:
         return output_path
 
     # ======================================================
-    # PROCESS PDF
+    # PROCESS PDF PATH
     # ======================================================
 
     def process(
         self,
         pdf_path: str | Path,
+        **overrides,
     ) -> tuple[str, Path]:
+        """
+        Process a complete PDF from disk.
 
-        self._configure()
+        Returns:
 
-        pdf_path = Path(
-            pdf_path
-        )
+            (
+                complete_ocr_text,
+                txt_output_path
+            )
+        """
+
+        pdf_path = Path(pdf_path)
 
         if not pdf_path.exists():
-
             raise FileNotFoundError(
                 f"PDF file not found: {pdf_path}"
             )
 
+        cfg = (
+            replace(self.cfg, **overrides)
+            if overrides
+            else self.cfg
+        )
+
         result = process_document(
-            pdf_path
+            pdf_path,
+            cfg,
         )
 
-        text = self._format_output(
-            result
-        )
+        text = result["text"]
 
-        txt_path = self.save_text(
+        output_path = self.save_text(
             pdf_path,
             text,
         )
 
-        return (
-            text,
-            txt_path,
-        )
+        return text, output_path
 
     # ======================================================
-    # PROCESS BYTES
+    # PROCESS UPLOADED BYTES
     # ======================================================
 
     def process_bytes(
         self,
         pdf_bytes: bytes,
         filename: str = "document.pdf",
+        **overrides,
     ) -> str:
+        """
+        Process a complete uploaded PDF.
 
-        self._configure()
+        This is the method your Streamlit uploader can use.
+
+        PDF bytes
+            ↓
+        temporary PDF
+            ↓
+        OCR EVERY PAGE
+            ↓
+        clean complete text
+            ↓
+        save .txt
+            ↓
+        return text
+        """
 
         if not pdf_bytes:
-
             raise ValueError(
                 "PDF bytes are empty."
             )
+
+        cfg = (
+            replace(self.cfg, **overrides)
+            if overrides
+            else self.cfg
+        )
+
+        # Only use the filename itself.
+        # This prevents paths supplied through an uploaded
+        # filename from escaping the output directory.
+        safe_stem = (
+            Path(
+                Path(filename).name
+            ).stem
+            or "document"
+        )
 
         suffix = (
             Path(filename).suffix
@@ -1591,10 +912,7 @@ class OCRProcessor:
             delete=False,
         ) as temp_file:
 
-            temp_file.write(
-                pdf_bytes
-            )
-
+            temp_file.write(pdf_bytes)
             temp_path = Path(
                 temp_file.name
             )
@@ -1602,16 +920,18 @@ class OCRProcessor:
         try:
 
             result = process_document(
-                temp_path
+                temp_path,
+                cfg,
             )
 
-            text = self._format_output(
-                result
-            )
+            # Complete OCR text.
+            text = result["text"]
 
+            # Save ONLY after the entire document
+            # has been OCR'd and cleaned.
             output_path = (
                 self.output_folder
-                / f"{Path(filename).stem}.txt"
+                / f"{safe_stem}.txt"
             )
 
             output_path.write_text(
@@ -1624,8 +944,63 @@ class OCRProcessor:
         finally:
 
             try:
+                temp_path.unlink(
+                    missing_ok=True
+                )
 
-                temp_path.unlink()
+            except OSError as exc:
 
-            except FileNotFoundError:
-                pass
+                print(
+                    f"  Could not remove temporary "
+                    f"file {temp_path}: {exc}"
+                )
+
+
+# ==========================================================
+# SIMPLE DIRECT USAGE
+# ==========================================================
+
+if __name__ == "__main__":
+
+    # ------------------------------------------------------
+    # CHANGE THIS PATH
+    # ------------------------------------------------------
+
+    PDF_PATH = r"document.pdf"
+
+    # ------------------------------------------------------
+    # CHANGE THIS ONLY IF TESSERACT IS NOT IN PATH
+    # ------------------------------------------------------
+
+    TESSERACT_PATH = (
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    )
+
+    # ------------------------------------------------------
+    # CREATE OCR PROCESSOR
+    # ------------------------------------------------------
+
+    processor = OCRProcessor(
+        tesseract_path=TESSERACT_PATH,
+        output_folder="ocr_output",
+        dpi=220,
+        psm=6,
+        language="eng",
+    )
+
+    # ------------------------------------------------------
+    # OCR THE WHOLE DOCUMENT
+    # ------------------------------------------------------
+
+    text, output_path = processor.process(
+        PDF_PATH
+    )
+
+    print()
+    print("=" * 70)
+    print("DONE")
+    print("=" * 70)
+    print(f"Output: {output_path}")
+    print(f"Characters: {len(text):,}")
+    print()
+    print(text[:5000])

@@ -142,6 +142,344 @@ class Candidate:
 def normalize(text: str) -> str:
     return " ".join(text.upper().split())
 
+def normalize(text: str) -> str:
+    return " ".join(text.upper().split())
+
+
+def clean_ocr_text(text: str) -> str:
+    """
+    Clean the complete OCR output after ALL pages have been extracted.
+
+    Flow:
+        OCR all pages
+            ↓
+        combine all extracted text
+            ↓
+        clean_ocr_text()
+            ↓
+        save .txt
+
+    This does NOT paraphrase or summarize the legal document.
+    """
+
+    if not text:
+        return ""
+
+    # ==========================================================
+    # 1. NORMALIZE
+    # ==========================================================
+
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    lines = []
+
+    for raw_line in text.split("\n"):
+
+        line = raw_line.strip()
+
+        if not line:
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
+
+        # ======================================================
+        # 2. REMOVE TABLE / SCAN ARTIFACTS
+        # ======================================================
+
+        # Remove vertical table borders ANYWHERE in the line.
+        line = re.sub(r"[|¦]", " ", line)
+
+        # Remove long horizontal OCR lines.
+        line = re.sub(r"[-_=]{4,}", " ", line)
+        line = re.sub(r"_{3,}", " ", line)
+
+        # Remove obvious decorative OCR symbols.
+        line = re.sub(
+            r"(?<!\w)[*@#~`^°¢£€©®•·]+(?!\w)",
+            " ",
+            line,
+        )
+
+        # Remove isolated backslashes.
+        line = re.sub(r"(?<!\w)\\(?!\w)", " ", line)
+
+        # ======================================================
+        # 3. HIGH-CONFIDENCE OCR CORRECTIONS
+        # ======================================================
+
+        corrections = {
+            # Court
+            r"\bCORT\b": "COURT",
+            r"\bCOUT\b": "COURT",
+            r"\bCOORT\b": "COURT",
+
+            # Karnataka
+            r"\bKamataka\b": "Karnataka",
+            r"\bKarnatake\b": "Karnataka",
+
+            # Common OCR errors
+            r"\bfram\b": "from",
+            r"\bfrorm\b": "from",
+            r"\bforma!\b": "formal",
+            r"\brnarked\b": "marked",
+            r"\bmace\b": "made",
+            r"\bthrougn\b": "through",
+
+            # Legal words
+            r"\bpetitloner\b": "petitioner",
+            r"\bPetitloner\b": "Petitioner",
+            r"\bpetitlon\b": "petition",
+            r"\brespondant\b": "respondent",
+
+            r"\bGommissioner\b": "Commissioner",
+            r"\bCommisioner\b": "Commissioner",
+            r"\bCommissloner\b": "Commissioner",
+
+            r"\bAsslstant\b": "Assistant",
+            r"\bReyenue\b": "Revenue",
+
+            r"\bGovemment\b": "Government",
+            r"\bgoverment\b": "government",
+
+            r"\bappllcation\b": "application",
+            r"\bapproprlate\b": "appropriate",
+            r"\bopportunlty\b": "opportunity",
+
+            r"\bunauthorlzed\b": "unauthorized",
+            r"\bregularizatlon\b": "regularization",
+            r"\brepresentatlon\b": "representation",
+            r"\bcancellatlon\b": "cancellation",
+
+            r"\bproceedlng\b": "proceeding",
+            r"\bproceedlngs\b": "proceedings",
+
+            r"\bnotlce\b": "notice",
+
+            r"\bOrignial\b": "Original",
+            r"\bAmnexure\b": "Annexure",
+            r"\bANNEXCURE\b": "ANNEXURE",
+
+            r"\bAlfidavil\b": "Affidavit",
+            r"\battidavit\b": "affidavit",
+            r"\bVeritying\b": "Verifying",
+            r"\bMemorand\b": "Memorandum",
+
+            # Other recurring OCR errors
+            r"\bLatter\b": "Letter",
+            r"\bDio\b": "D/o",
+            r"\bWio\b": "W/o",
+        }
+
+        for pattern, replacement in corrections.items():
+            line = re.sub(
+                pattern,
+                replacement,
+                line,
+            )
+
+        # ======================================================
+        # 4. CONTEXT-SPECIFIC LEGAL CORRECTIONS
+        # ======================================================
+
+        # HIGH CORT OF KARNATAKA
+        line = re.sub(
+            r"\bHIGH\s+CORT\b",
+            "HIGH COURT",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Farr/Far No.53 -> Form No.53
+        line = re.sub(
+            r"\bFarr\s+No\.",
+            "Form No.",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        line = re.sub(
+            r"\bFar\s+No\.",
+            "Form No.",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Rule 108 D (3)
+        line = re.sub(
+            r"\bRule\s+108\s+D\s*\(\s*3\s*\)",
+            "Rule 108-D(3)",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # Rule 108-D-3
+        line = re.sub(
+            r"\bRule\s+108-D-3\b",
+            "Rule 108-D(3)",
+            line,
+            flags=re.IGNORECASE,
+        )
+
+        # ======================================================
+        # 5. WHITESPACE
+        # ======================================================
+
+        line = re.sub(r"[ \t]+", " ", line)
+
+        # Space before punctuation
+        line = re.sub(
+            r"\s+([,.;:!?])",
+            r"\1",
+            line,
+        )
+
+        # Missing space after punctuation
+        line = re.sub(
+            r"([,.;:!?])(?=[A-Za-z])",
+            r"\1 ",
+            line,
+        )
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        # ======================================================
+        # 6. REMOVE OBVIOUS GARBAGE LINES
+        # ======================================================
+
+        # Standalone page number
+        if re.fullmatch(r"\d{1,3}", line):
+            continue
+
+        # Standalone punctuation/symbols
+        if re.fullmatch(r"[\W_]+", line):
+            continue
+
+        # Tiny OCR garbage
+        if re.fullmatch(r"[A-Za-z]{1,2}", line):
+            if line.upper() not in {
+                "IN",
+                "OF",
+                "TO",
+                "BY",
+                "OR",
+                "NO",
+                "RS",
+                "MR",
+                "MS",
+                "DR",
+                "VS",
+                "WP",
+                "IA",
+                "RA",
+                "AND",
+                "AS",
+                "IS",
+                "ON",
+                "AT",
+                "A",
+                "I",
+            }:
+                continue
+
+        lines.append(line)
+
+    # ==========================================================
+    # 7. REBUILD BROKEN OCR LINES
+    # ==========================================================
+
+    final_lines = []
+
+    for line in lines:
+
+        if not line:
+            if final_lines and final_lines[-1] != "":
+                final_lines.append("")
+            continue
+
+        # Never merge headings.
+        is_heading = (
+            line.isupper()
+            and len(line) <= 100
+        )
+
+        # Never merge numbered legal paragraphs.
+        is_numbered = bool(
+            re.match(
+                r"^(?:\d+[.)]|\([A-Za-z0-9]+\)|[A-Za-z][.)])\s+",
+                line,
+            )
+        )
+
+        if (
+            final_lines
+            and final_lines[-1]
+            and not is_heading
+            and not is_numbered
+        ):
+
+            previous = final_lines[-1]
+
+            previous_is_heading = (
+                previous.isupper()
+                and len(previous) <= 100
+            )
+
+            if not previous_is_heading:
+
+                # Join obvious wrapped sentences.
+                if (
+                    not previous.endswith(
+                        (".", ":", ";", "?", "!")
+                    )
+                    and not line.startswith(
+                        (
+                            "ANNEXURE",
+                            "INDEX",
+                            "SYNOPSIS",
+                            "WHEREFORE",
+                            "BENGALURU",
+                            "DATE:",
+                            "ADVOCATE",
+                            "BETWEEN:",
+                            "AND:",
+                        )
+                    )
+                ):
+                    final_lines[-1] = (
+                        previous.rstrip()
+                        + " "
+                        + line.lstrip()
+                    )
+                    continue
+
+        final_lines.append(line)
+
+    # ==========================================================
+    # 8. FINAL BLANK-LINE CLEANUP
+    # ==========================================================
+
+    output = []
+
+    for line in final_lines:
+
+        if not line.strip():
+
+            if output and output[-1] != "":
+                output.append("")
+
+        else:
+            output.append(line.rstrip())
+
+    while output and not output[0].strip():
+        output.pop(0)
+
+    while output and not output[-1].strip():
+        output.pop()
+
+    return "\n".join(output)
 
 def compact(text: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", normalize(text))
@@ -1423,6 +1761,9 @@ class OCRProcessor:
 
         text = self._format_output(result)
 
+        # Clean the complete extracted text before saving
+        text = clean_ocr_text(text)
+
         txt_path = self.save_text(pdf_path, text)
 
         return text, txt_path
@@ -1460,11 +1801,19 @@ class OCRProcessor:
         try:
             result = process_document(temp_path, cfg)
 
+            # ALL pages have already been extracted here
             text = self._format_output(result)
 
+            # CLEAN THE COMPLETE OCR OUTPUT
+            text = clean_ocr_text(text)
+
+            # ONLY NOW SAVE IT
             output_path = self.output_folder / f"{safe_stem}.txt"
 
-            output_path.write_text(text, encoding="utf-8")
+            output_path.write_text(
+                text,
+                encoding="utf-8"
+            )
 
             return text
 

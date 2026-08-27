@@ -1,18 +1,69 @@
 # ==========================================================
+# CCMS v2 — Python dependencies
+#
+# Tested with: Python 3.14 (local) / Python 3.11 (Dockerfile)
+# ==========================================================
+
+
+# ==========================================================
 # Streamlit UI
+#   app.py, ccms_app.py
 # ==========================================================
 
 streamlit>=1.45.0
-streamlit-pdf-viewer>=0.0.26
+
+
+# ==========================================================
+# FastAPI service
+#   app/api.py  (python-multipart is required by UploadFile,
+#   gunicorn is the Dockerfile CMD entrypoint)
+# ==========================================================
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+gunicorn>=22.0.0
+
 
 # ==========================================================
 # LLM
+#   extractor/llm/ollama_client.py
 # ==========================================================
 
 ollama>=0.5.0
 
+
+# ==========================================================
+# Embeddings / RAG
+#   RAG/embedding.py       -> torch, transformers, numpy
+#   RAG/chunker.py         -> transformers (AutoTokenizer)
+#   RAG/vector_store.py    -> qdrant_client
+#   RAG/retriever.py       -> qdrant_client.models
+#   RAG/hybrid_retreiver.py-> rank_bm25
+#
+# NOTE: transformers 5.x is a major release with breaking
+# changes. Pin with == if you need reproducible builds.
+#
+# NOTE: on Linux, plain `torch` pulls ~2.5 GB of CUDA wheels.
+# This project runs on CPU, so for Docker/CI install with:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# ==========================================================
+
+torch>=2.4.0
+transformers>=4.44.0
+numpy>=1.26.0
+qdrant-client>=1.9.0
+rank-bm25>=0.2.2
+
+# BAAI/bge-m3 is XLM-RoBERTa based; its tokenizer needs these.
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+
+
 # ==========================================================
 # OCR
+#   ocr.py, ocr_v2.py, app/ocr.py, OCR/*.py
+#   fitz == PyMuPDF
 # ==========================================================
 
 pytesseract>=0.3.13
@@ -20,21 +71,52 @@ pdf2image>=1.17.0
 Pillow>=11.2.1
 opencv-python>=4.11.0.86
 PyMuPDF>=1.26.3
+pypdf>=5.0.0
+
 
 # ==========================================================
-# Utilities
+# Text matching / normalization
+#   extractor/act_normalizer.py, ocr.py, ocr_v2.py,
+#   section_extractor.py, OCR/*.py
 # ==========================================================
 
-tqdm>=4.67.1
+rapidfuzz>=3.0.0
+
 
 # ==========================================================
-# Optional (Recommended)
+# Excel export
+#   app.py
+# ==========================================================
+
+openpyxl>=3.1.0
+
+
+# ==========================================================
+# Config
+#   config/settings.py
 # ==========================================================
 
 python-dotenv>=1.1.1
-rapidfuzz>=3.0.0
 
-fastapi
-uvicorn[standard]
-python-multipart
-gunicorn
+
+# ==========================================================
+# OPTIONAL — legacy / unreferenced modules
+#
+# extractor/vector_retriever.py and extractor/vector_service.py
+# import these, but no live module imports those two files.
+# They also require an OpenAI API key. Left commented so
+# `pip install -r` does not pull the whole LangChain tree.
+# Uncomment if you revive them, or delete the two files.
+# ==========================================================
+
+# langchain-community>=0.3.0
+# langchain-openai>=0.2.0
+# langchain-text-splitters>=0.3.0
+
+
+# ==========================================================
+# System packages (not pip) — see Dockerfile
+#   tesseract-ocr    (pytesseract)
+#   poppler-utils    (pdf2image)
+#   libgl1, libglib2.0-0  (opencv-python)
+# ==========================================================
