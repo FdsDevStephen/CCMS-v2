@@ -6,6 +6,7 @@ import logging
 import os
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 from datetime import datetime
 from pathlib import Path
@@ -789,9 +790,9 @@ def get_ocr_processor():
         fast_dpi=150,
         full_dpi=220,
 
-        # IMPORTANT:
-        # Keep this low on an 8 GB machine.
-        max_workers=1,
+        # Multi-threaded OCR — pytesseract releases the GIL,
+        # so threads give real parallelism on CPU-bound OCR.
+        max_workers=min(4, os.cpu_count() or 4),
 
         page_start=2,
         page_end=13,
@@ -804,6 +805,18 @@ def get_ocr_processor():
 def get_legal_extractor():
 
     return LegalExtractor()
+
+
+@st.cache_resource
+def get_vector_store():
+
+    return QdrantVectorStore()
+
+
+@st.cache_resource
+def get_legal_retriever(_embedding_model):
+
+    return LegalRetriever(embedding_model=_embedding_model)
 
 
 # ==========================================================
@@ -932,58 +945,29 @@ def run_pipeline(
     )
 
     # ======================================================
-    # 2. LEGAL EXTRACTION
+    # 2 + 3. LEGAL EXTRACTION + PRAYER (parallel)
     # ======================================================
+    # Both are pure regex/LLM calls on the same ocr_text
+    # with no dependency on each other.
 
-    stage_start = (
-        time.perf_counter()
-    )
+    stage_start = time.perf_counter()
 
-    legal_extractor = (
-        get_legal_extractor()
-    )
+    legal_extractor = get_legal_extractor()
+    prayer_extractor = PrayerExtractor()
 
-    base_result = (
-        legal_extractor.extract(
-            text=ocr_text,
-            case_number=document_name,
+    with ThreadPoolExecutor(max_workers=2) as _pool:
+        legal_future = _pool.submit(
+            legal_extractor.extract, ocr_text, document_name
         )
-    )
-
-    timings[
-        "Legal Extraction"
-    ] = (
-        time.perf_counter()
-        - stage_start
-    )
-
-    # ======================================================
-    # 3. PRAYER
-    # ======================================================
-
-    stage_start = (
-        time.perf_counter()
-    )
-
-    prayer_extractor = (
-        PrayerExtractor()
-    )
-
-    prayer = (
-        prayer_extractor.extract(
-            ocr_text
+        prayer_future = _pool.submit(
+            prayer_extractor.extract, ocr_text
         )
-    )
 
-    base_result[
-        "prayer"
-    ] = prayer
+    base_result = legal_future.result()
+    base_result["prayer"] = prayer_future.result()
 
-    timings[
-        "Prayer"
-    ] = (
-        time.perf_counter()
-        - stage_start
+    timings["Legal Extraction + Prayer"] = (
+        time.perf_counter() - stage_start
     )
 
     # ======================================================
@@ -1056,7 +1040,7 @@ def run_pipeline(
     embeddings = (
         embedding_model.encode(
             texts,
-            batch_size=12,
+            batch_size=32,
         )
     )
 
@@ -1075,9 +1059,7 @@ def run_pipeline(
         time.perf_counter()
     )
 
-    vector_store = (
-        QdrantVectorStore()
-    )
+    vector_store = get_vector_store()
 
     vector_store.insert(
         chunks,
@@ -1099,11 +1081,7 @@ def run_pipeline(
         time.perf_counter()
     )
 
-    legal_retriever = (
-        LegalRetriever(
-            embedding_model=embedding_model,
-        )
-    )
+    legal_retriever = get_legal_retriever(embedding_model)
 
     hybrid_retriever = (
         HybridRetriever(

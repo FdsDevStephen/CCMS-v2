@@ -142,9 +142,6 @@ class Candidate:
 def normalize(text: str) -> str:
     return " ".join(text.upper().split())
 
-def normalize(text: str) -> str:
-    return " ".join(text.upper().split())
-
 
 def clean_ocr_text(text: str) -> str:
     """
