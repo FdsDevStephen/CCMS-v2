@@ -113,3 +113,9 @@ hf_cache/
 ccms-source.zip
 
 structure.txt
+
+.claude/
+.github/
+__pycache__/
+_singleton_backup/
+_speedup_backup/
