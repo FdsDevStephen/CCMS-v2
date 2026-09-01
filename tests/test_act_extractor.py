@@ -6,7 +6,7 @@ sys.path.insert(
     str(Path(__file__).resolve().parent.parent)
 )
 
-from act_extractor import ActExtractor
+from rag.act_extractor import ActExtractor
 
 
 print("=" * 80)

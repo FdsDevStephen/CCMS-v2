@@ -4,7 +4,7 @@ import json
 import re
 
 from extractor.llm.factory import get_llm_client
-from RAG.hybrid_retreiver import HybridRetriever
+from rag.hybrid_retreiver import HybridRetriever
 
 
 class ActExtractor:

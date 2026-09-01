@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from rank_bm25 import BM25Okapi
 
-from RAG.retriever import LegalRetriever
+from rag.retriever import LegalRetriever
 
 
 @dataclass

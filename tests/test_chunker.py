@@ -1,6 +1,6 @@
 print("TEST STARTED", flush=True)
 
-from chunker import LegalTextChunker
+from rag.chunker import LegalTextChunker
 
 print("CHUNKER IMPORTED", flush=True)
 

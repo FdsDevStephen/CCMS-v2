@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from chunker import LegalTextChunker
-from embedding import EmbeddingModel
-from vector_store import QdrantVectorStore
-from retriever import LegalRetriever
+from rag.chunker import LegalTextChunker
+from rag.embedding import EmbeddingModel
+from rag.vector_store import QdrantVectorStore
+from rag.retriever import LegalRetriever
 
 
 TXT_FILE = Path(

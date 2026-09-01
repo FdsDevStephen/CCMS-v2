@@ -65,17 +65,17 @@ from extractor.survey_location import (
     SurveyLocationExtractor,
 )
 
-from RAG.chunker import LegalTextChunker
+from rag.chunker import LegalTextChunker
 
-from RAG.embedding import EmbeddingModel
+from rag.embedding import EmbeddingModel
 
-from RAG.retriever import LegalRetriever
+from rag.retriever import LegalRetriever
 
-from RAG.hybrid_retreiver import HybridRetriever
+from rag.hybrid_retreiver import HybridRetriever
 
-from RAG.vector_store import QdrantVectorStore
+from rag.vector_store import QdrantVectorStore
 
-from RAG.act_extractor import ActExtractor
+from rag.act_extractor import ActExtractor
 
 
 # ==========================================================

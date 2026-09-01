@@ -1,4 +1,4 @@
-from retriever import LegalRetriever
+from rag.retriever import LegalRetriever
 
 
 retriever = LegalRetriever()

@@ -119,3 +119,4 @@ structure.txt
 __pycache__/
 _singleton_backup/
 _speedup_backup/
+uploads/

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from RAG.embedding import EmbeddingModel
-from RAG.vector_store import QdrantVectorStore
+from rag.embedding import EmbeddingModel
+from rag.vector_store import QdrantVectorStore
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 

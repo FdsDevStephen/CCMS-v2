@@ -1,6 +1,6 @@
-from chunker import LegalTextChunker
-from embedding import EmbeddingModel
-from vector_store import QdrantVectorStore
+from rag.chunker import LegalTextChunker
+from rag.embedding import EmbeddingModel
+from rag.vector_store import QdrantVectorStore
 
 
 TXT_PATH = "../section_output/WP-14650-2021-B.txt"

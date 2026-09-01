@@ -204,7 +204,7 @@ class PrayerExtractor:
             )
 
             if prayer:
-                return prayer
+                return self._strip_noise(prayer)
 
         # ======================================================
         # 2. PRAYER HEADING
@@ -229,7 +229,7 @@ class PrayerExtractor:
             )
 
             if prayer:
-                return prayer
+                return self._strip_noise(prayer)
 
         # ======================================================
         # 3. WHEREFORE
@@ -254,7 +254,7 @@ class PrayerExtractor:
             )
 
             if prayer:
-                return prayer
+                return self._strip_noise(prayer)
 
         # ======================================================
         # 4. THEREFORE
@@ -279,7 +279,7 @@ class PrayerExtractor:
             )
 
             if prayer:
-                return prayer
+                return self._strip_noise(prayer)
 
         # ======================================================
         # 5. PETITIONER PRAYS FALLBACK
@@ -308,7 +308,7 @@ class PrayerExtractor:
             )
 
             if prayer:
-                return prayer
+                return self._strip_noise(prayer)
 
         return ""
 
@@ -584,6 +584,40 @@ class PrayerExtractor:
         return "\n\n".join(
             final
         ).strip()
+
+    # ==========================================================
+    # GENTLE NOISE CLEANUP (last step — obvious OCR artifacts only)
+    # ==========================================================
+
+    @staticmethod
+    def _strip_noise(text: str) -> str:
+        """Remove obvious OCR noise. Does NOT touch legal wording."""
+
+        # Underscores used as noise: _ respondent → respondent
+        text = re.sub(r"(?<!\w)_(?!\w)", " ", text)
+        text = re.sub(r"(?<=\w)_(?=\s)", " ", text)
+
+        # Pipe characters used as noise: | Respondent → Respondent
+        text = re.sub(r"(?<=\w)\s*\|\s*(?=\w)", " ", text)
+
+        # Stray semicolons between letters: the; endorsement → the endorsement
+        text = re.sub(
+            r"(?<=[a-zA-Z])\s*;\s*(?=[a-zA-Z])",
+            " ",
+            text,
+        )
+
+        # Smart quotes → straight quotes
+        text = text.replace("\u2018", "'").replace("\u2019", "'")
+        text = text.replace("\u201c", '"').replace("\u201d", '"')
+
+        # Em dash / en dash → space
+        text = text.replace("\u2014", " ").replace("\u2013", " ")
+
+        # Clean up double spaces
+        text = re.sub(r"  +", " ", text)
+
+        return text.strip()
 
     # ==========================================================
     # CLAUSE DETECTION
