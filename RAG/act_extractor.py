@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 
+from extractor.act_normalizer import ActNormalizer
 from extractor.llm.factory import get_llm_client
 from rag.hybrid_retreiver import HybridRetriever
 
@@ -163,6 +164,41 @@ SUPPLIED TEXT:
                 return {}
 
     @staticmethod
+    def _is_valid_act_name(name: str) -> bool:
+        """Reject obviously non-act names (noise from OCR chunks)."""
+        if not name or len(name) < 5:
+            return False
+
+        name_lower = name.lower()
+
+        # Reject if it's clearly not an Act
+        noise_words = [
+            "memorandum", "verifying", "affidavit", "annexure",
+            "schedule", "index", "list of dates", "synopsis",
+            "writ petition", "writ appeal", "high court",
+            "certified copy", "government order", "notification",
+            "order dated", "judgment", "decree", "order passed",
+            "copy of", "respondent", "petitioner", "appellant",
+            "state of karnataka", "sl. no", "particulars",
+        ]
+
+        for nw in noise_words:
+            if nw in name_lower:
+                return False
+
+        # Must contain Act-related words to be valid
+        act_words = [
+            "act", "ordinance", "code", "regulation",
+            "constitution", "rule", "notification",
+        ]
+
+        has_act_word = any(w in name_lower for w in act_words)
+        if not has_act_word:
+            return False
+
+        return True
+
+    @staticmethod
     def _validate_result(
         result: dict,
         valid_sections: list[str],
@@ -175,6 +211,9 @@ SUPPLIED TEXT:
 
         acts: list[dict] = []
         seen_acts: set[str] = set()
+        act_name_map: dict[str, str] = {}  # raw -> normalized
+
+        normalizer = ActNormalizer()
 
         for item in raw_acts:
             if not isinstance(item, dict):
@@ -183,6 +222,18 @@ SUPPLIED TEXT:
             name = str(item.get("name", "")).strip()
 
             if not name or name in seen_acts:
+                continue
+
+            # Reject obvious noise
+            if not ActExtractor._is_valid_act_name(name):
+                continue
+
+            # Normalize against known acts database
+            normalized = normalizer.normalize(name)
+            act_name_map[name] = normalized
+            name = normalized
+
+            if name in seen_acts:
                 continue
 
             seen_acts.add(name)
@@ -204,6 +255,9 @@ SUPPLIED TEXT:
 
             if not act or not isinstance(sections, list):
                 continue
+
+            # Normalize act name in mapping too
+            act = act_name_map.get(act, normalizer.normalize(act))
 
             cleaned_sections: list[str] = []
 
