@@ -226,6 +226,14 @@ def normalize_survey_text(survey: str) -> str:
     survey = re.sub(r"^i\.?e\.?,?\s*", "", survey, flags=re.IGNORECASE)
     survey = clean_spaces(survey)
 
+    # "81., 82" -> "81, 82" so the truncation below keeps the whole list.
+    survey = re.sub(
+        r"\.(?=\s*(?:,|&|\band\b))",
+        "",
+        survey,
+        flags=re.IGNORECASE,
+    )
+
     # 9. A -> 9
     # 9.A -> 9
     survey = re.sub(

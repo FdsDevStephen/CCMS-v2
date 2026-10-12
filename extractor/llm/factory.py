@@ -17,7 +17,19 @@ def get_llm_client() -> BaseLLMClient:
         BaseLLMClient
     """
 
-    if LLM_PROVIDER.lower() == "ollama":
+    provider = LLM_PROVIDER.lower()
+
+    if provider == "ollama":
         return OllamaClient()
+
+    if provider == "openai":
+        from extractor.llm.openai_client import OpenAICompatibleClient
+
+        return OpenAICompatibleClient()
+
+    if provider in ("generate", "gemma"):
+        from extractor.llm.generate_client import GenerateClient
+
+        return GenerateClient()
 
     raise ValueError(f"Unsupported LLM Provider: {LLM_PROVIDER}")

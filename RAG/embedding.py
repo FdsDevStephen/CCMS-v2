@@ -1,10 +1,121 @@
 from __future__ import annotations
 
+import gc
 import threading
 
 import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
+
+EMBEDDING_DIM = 1024  # BGE-M3
+
+
+def _free_memory_gb() -> float | None:
+    """
+    Free commit memory in GB, or None if unknown.
+
+    On Windows this is the commit limit left (what "The paging file is
+    too small" errors run out of); psutil would overcount it by adding
+    unused page-file space.
+    """
+    try:
+        import ctypes
+
+        class _MemoryStatus(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = _MemoryStatus()
+        status.dwLength = ctypes.sizeof(status)
+
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return status.ullAvailPageFile / 2**30
+    except Exception:
+        pass
+
+    try:
+        import psutil
+
+        return (
+            psutil.virtual_memory().available
+            + psutil.swap_memory().free
+        ) / 2**30
+    except Exception:
+        pass
+
+    return None
+
+
+def _loaded_llm_gb() -> float:
+    """
+    Size in GB of the configured Ollama model if it is already loaded.
+
+    That memory is already counted as used, so "auto" should not demand
+    free room for it a second time.
+    """
+    try:
+        import json
+        import urllib.request
+
+        from config.settings import LLM_BASE_URL, MODEL_NAME
+
+        with urllib.request.urlopen(
+            f"{LLM_BASE_URL}/api/ps", timeout=2
+        ) as response:
+            models = json.load(response).get("models", [])
+
+        return sum(
+            m.get("size", 0) for m in models
+            if m.get("name") == MODEL_NAME
+        ) / 2**30
+    except Exception:
+        return 0.0
+
+
+def _cpu_dtype() -> torch.dtype:
+    from config.settings import (
+        EMBEDDING_CPU_DTYPE,
+        EMBEDDING_FLOAT32_MIN_FREE_GB,
+    )
+
+    choice = EMBEDDING_CPU_DTYPE.strip().lower()
+
+    if choice != "auto":
+        return getattr(torch, choice)
+
+    free = _free_memory_gb()
+
+    if free is None:
+        return torch.float32
+
+    from config.settings import LLM_PROVIDER
+
+    if LLM_PROVIDER.lower() == "ollama":
+        needed = EMBEDDING_FLOAT32_MIN_FREE_GB - _loaded_llm_gb()
+    else:
+        # Remote LLM: only BGE-M3 itself (~4 GB in float32) must fit.
+        needed = 4.5
+
+    if free >= needed:
+        return torch.float32
+
+    print(
+        f">>> Only {free:.1f} GB memory free (float32 needs "
+        f"{needed:.1f} GB): loading BGE-M3 in bfloat16 (smaller, "
+        f"~5x slower embeddings) so Ollama still fits. Close other "
+        f"programs and restart for the fast mode.",
+        flush=True,
+    )
+    return torch.bfloat16
 
 
 class EmbeddingModel:
@@ -42,6 +153,25 @@ class EmbeddingModel:
     ):
         self.model_name = model_name
         self.max_length = max_length
+        self.remote_url = None
+
+        from config.settings import EMBEDDING_PROVIDER, EMBEDDING_URL
+
+        if EMBEDDING_PROVIDER.lower() == "remote":
+            # Hosted BGE-M3: no model in local memory. The tokenizer is
+            # still needed locally by the chunker (it is small).
+            self.remote_url = EMBEDDING_URL
+            self.model = None
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                local_files_only=True,
+            )
+
+            print(
+                f">>> Embeddings: remote BGE-M3 at {EMBEDDING_URL}",
+                flush=True,
+            )
+            return
 
         if device is None:
             device = (
@@ -71,7 +201,7 @@ class EmbeddingModel:
                 flush=True,
             )
 
-            dtype = torch.float32
+            dtype = _cpu_dtype()
 
         print(
             f">>> Embedding dtype: {dtype}",
@@ -98,6 +228,10 @@ class EmbeddingModel:
         self.model.to(self.device)
         self.model.eval()
 
+        # Free the temporary state dict left over from loading
+        # pytorch_model.bin, so it doesn't sit in RAM next to Ollama.
+        gc.collect()
+
         print(
             ">>> Embedding model loaded",
             flush=True,
@@ -113,7 +247,7 @@ class EmbeddingModel:
             return np.empty(
                 (
                     0,
-                    self.model.config.hidden_size,
+                    EMBEDDING_DIM,
                 ),
                 dtype=np.float32,
             )
@@ -121,6 +255,12 @@ class EmbeddingModel:
         if batch_size <= 0:
             raise ValueError(
                 "batch_size must be greater than 0."
+            )
+
+        if self.remote_url:
+            return self._encode_remote(
+                texts,
+                batch_size,
             )
 
         all_embeddings: list[np.ndarray] = []
@@ -187,6 +327,54 @@ class EmbeddingModel:
                 .cpu()
                 .numpy()
                 .astype(np.float32)
+            )
+
+        return np.vstack(all_embeddings)
+    def _encode_remote(
+        self,
+        texts: list[str],
+        batch_size: int,
+    ) -> np.ndarray:
+        """POST {"texts": [...]} -> {"embeddings": [[...], ...]}."""
+        import time
+
+        import requests
+
+        from config.settings import MAX_RETRIES, REQUEST_TIMEOUT
+
+        all_embeddings: list[np.ndarray] = []
+
+        for start in range(0, len(texts), batch_size):
+            batch = [str(text) for text in texts[start:start + batch_size]]
+
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    response = requests.post(
+                        self.remote_url,
+                        json={"texts": batch},
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    response.raise_for_status()
+                    embeddings = response.json()["embeddings"]
+                    break
+                except Exception as e:
+                    print(
+                        f"[Embeddings] Attempt {attempt}/{MAX_RETRIES} "
+                        f"failed: {e}",
+                        flush=True,
+                    )
+
+                    if attempt == MAX_RETRIES:
+                        raise RuntimeError(
+                            f"Remote embedding service at "
+                            f"{self.remote_url} failed after "
+                            f"{MAX_RETRIES} attempts."
+                        ) from e
+
+                    time.sleep(2)
+
+            all_embeddings.append(
+                np.asarray(embeddings, dtype=np.float32)
             )
 
         return np.vstack(all_embeddings)

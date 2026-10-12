@@ -131,12 +131,13 @@ class OllamaClient(BaseLLMClient):
                     )
 
                     raise RuntimeError(
-                        "Ollama could not "
-                        "start because the "
-                        "GPU is out of memory. "
-                        "Release BGE-M3 GPU "
-                        "memory before "
-                        "calling Ollama."
+                        f"Ollama could not load "
+                        f"'{MODEL_NAME}': not "
+                        f"enough memory (RAM, or "
+                        f"GPU if one is used). "
+                        f"Close other programs, or "
+                        f"set a smaller MODEL_NAME "
+                        f"in .env."
                     ) from e
 
 

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from rag.embedding import EmbeddingModel
-from rag.vector_store import QdrantVectorStore
-from qdrant_client.models import FieldCondition, Filter, MatchValue
+from rag.vector_store import get_vector_store
 
 
 class LegalRetriever:
-    """Vector retrieval over the Qdrant legal-document collection."""
+    """Vector retrieval over the configured vector store."""
 
     def __init__(
         self,
         embedding_model: EmbeddingModel | None = None,
+        vector_store=None,
     ):
         self.embedding_model = embedding_model or EmbeddingModel()
-        self.vector_store = QdrantVectorStore()
+        self.vector_store = vector_store or get_vector_store()
 
     def search(
         self,
@@ -29,24 +29,8 @@ class LegalRetriever:
 
         query_embedding = self.embedding_model.encode([query])[0]
 
-        query_filter = None
-
-        if document:
-            query_filter = Filter(
-                must=[
-                    FieldCondition(
-                        key="document",
-                        match=MatchValue(value=document),
-                    )
-                ]
-            )
-
-        response = self.vector_store.client.query_points(
-            collection_name=self.vector_store.COLLECTION_NAME,
-            query=query_embedding.tolist(),
-            query_filter=query_filter,
-            limit=top_k,
-            with_payload=True,
+        return self.vector_store.search(
+            query_embedding,
+            top_k=top_k,
+            document=document,
         )
-
-        return response.points

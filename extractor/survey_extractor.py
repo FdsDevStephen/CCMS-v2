@@ -5,6 +5,7 @@ Survey Number Extractor.
 from __future__ import annotations
 
 import re
+from typing import Iterator
 
 
 class SurveyExtractor:
@@ -20,16 +21,17 @@ class SurveyExtractor:
         re.IGNORECASE | re.VERBOSE,
     )
 
+    # Prefixes: Sy.No, S.No, Survey No/Number, Re-Sy.No, Re-Survey No,
+    # R.S.No / RS.No, plus common OCR variants (S¥.No, Sy.Na, Sy.n0).
     SURVEY_PATTERN = re.compile(
         r"""
 (?:
-    \bS\.?\s*Nos?\.?|
-    \bSy\.?\s*Nos?\.?|
-    \bRe-Sy\.?\s*Nos?\.?|
-    \bRe-Survey\s*Nos?\.?|
-    \bSurvey\s*Nos?\.?|
+    \bR\.?\s*S\.?\s*N[o0]s?\.?|
+    \bRe-?\s*Sy\.?\s*N[o0]s?\.?|
+    \bRe-?\s*Survey\s*N[o0]s?\.?|
+    \bS[y¥]?\.?\s*N[o0a]s?\.?|
     \bSurvey\s*Numbers?|
-    \bSurvey\s*Number
+    \bSurvey\s*N[o0]s?\.?
 )
 
 [\s:.-]*
@@ -42,11 +44,11 @@ class SurveyExtractor:
     (?:/[A-Za-z0-9*]+)*
 
     (?:
-        \s*
-        (?:,|&|\band\b)
+        \s*\.?\s*
+        (?:,\s*(?:and\b|&)?|&|\band\b)
         \s*
 
-        \d+
+        \d+(?!\d|(?:st|nd|rd|th)\b)
         (?-i:(?:(?<!\.)\s+(?:A|B|C|AA|AB|AC|AD))?)
         (?:/[A-Za-z0-9*]+)*
     )*
@@ -58,14 +60,27 @@ class SurveyExtractor:
     def __init__(self, text: str):
         self.text = text
 
+    def iter_mentions(self) -> Iterator[re.Match]:
+        """
+        Yield every survey-number mention in the text.
+
+        Match offsets refer to the original text, so callers can look at
+        the surrounding context (used by SurveyLocationExtractor).
+        """
+        # Blank out civil suit case numbers (O.S.No.158/1984) without
+        # shifting offsets.
+        cleaned_text = self.CASE_NUMBER_PATTERN.sub(
+            lambda m: " " * len(m.group(0)),
+            self.text,
+        )
+
+        yield from self.SURVEY_PATTERN.finditer(cleaned_text)
+
     def extract(self) -> list[str]:
         seen = set()
         surveys = []
 
-        # Remove civil suit case numbers before extracting survey numbers.
-        cleaned_text = self.CASE_NUMBER_PATTERN.sub(" ", self.text)
-
-        for match in self.SURVEY_PATTERN.finditer(cleaned_text):
+        for match in self.iter_mentions():
             survey = match.group(1).strip()
 
             if survey not in seen:

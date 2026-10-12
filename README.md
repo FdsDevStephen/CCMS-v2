@@ -29,7 +29,7 @@ The extracted information is returned as clean, validated JSON.
 - PDF document processing
 - OCR support for scanned documents
 - Survey Number extraction using Regex
-- Survey Location extraction using an LLM
+- Survey Location extraction: rule-based linking of survey numbers to Village/Hobli/Taluk/District, with an LLM fallback
 - Automatic mapping of Village, Hobli, Taluk and District to survey numbers
 - Act extraction using LLM
 - Section extraction using Regex
@@ -59,7 +59,7 @@ The extracted information is returned as clean, validated JSON.
           └──────────────────┘
                      │
                      ▼
-      Survey Location Extraction (LLM)
+  Survey Location Extraction (Rules + LLM fallback)
                      │
                      ▼
          Act Extraction (Chunked LLM)

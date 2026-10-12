@@ -73,7 +73,7 @@ from rag.retriever import LegalRetriever
 
 from rag.hybrid_retreiver import HybridRetriever
 
-from rag.vector_store import QdrantVectorStore
+from rag.vector_store import get_vector_store as _get_vector_store
 
 from rag.act_extractor import ActExtractor
 
@@ -374,6 +374,38 @@ def get_act_name(
     ).strip()
 
 
+LOCATION_FIELDS = [
+    ("village", "Village"),
+    ("hobli", "Hobli"),
+    ("taluk", "Taluk"),
+    ("district", "District"),
+]
+
+
+def format_location_parts(
+    location: dict,
+) -> list[str]:
+    """
+    "Village: X", "Hobli: Y", "Taluk: Z", "District: W".
+    """
+
+    parts = []
+
+    for key, label in LOCATION_FIELDS:
+
+        value = location.get(
+            key
+        )
+
+        if value:
+
+            parts.append(
+                f"{label}: {value}"
+            )
+
+    return parts
+
+
 def format_survey_locations(
     locations,
 ) -> str:
@@ -404,43 +436,9 @@ def format_survey_locations(
             or ""
         ).strip()
 
-        parts = []
-
-        village = location.get(
-            "village"
+        parts = format_location_parts(
+            location
         )
-
-        hobli = location.get(
-            "hobli"
-        )
-
-        taluk = location.get(
-            "taluk"
-        )
-
-        district = location.get(
-            "district"
-        )
-
-        if village:
-            parts.append(
-                f"Village: {village}"
-            )
-
-        if hobli:
-            parts.append(
-                f"Hobli: {hobli}"
-            )
-
-        if taluk:
-            parts.append(
-                f"Taluk: {taluk}"
-            )
-
-        if district:
-            parts.append(
-                f"District: {district}"
-            )
 
         if parts:
 
@@ -810,13 +808,17 @@ def get_legal_extractor():
 @st.cache_resource
 def get_vector_store():
 
-    return QdrantVectorStore()
+    # In memory by default (VECTOR_STORE=memory), so no Docker is needed.
+    return _get_vector_store()
 
 
 @st.cache_resource
 def get_legal_retriever(_embedding_model):
 
-    return LegalRetriever(embedding_model=_embedding_model)
+    return LegalRetriever(
+        embedding_model=_embedding_model,
+        vector_store=get_vector_store(),
+    )
 
 
 # ==========================================================
@@ -848,6 +850,42 @@ def save_uploaded_pdf(
 # MAIN PIPELINE
 # ==========================================================
 
+class PipelineLog(dict):
+    """
+    Stage timings (shown in the UI) that also print every step to the
+    terminal, so slow stages are visible while a document is processing.
+    """
+
+    def __init__(self, document: str):
+        super().__init__()
+        self.document = document
+
+    @staticmethod
+    def _memory() -> str:
+        try:
+            import psutil
+
+            used = psutil.Process().memory_info().rss / 2**30
+            free = psutil.virtual_memory().available / 2**30
+            return f"app {used:.1f} GB, RAM free {free:.1f} GB"
+        except Exception:
+            return ""
+
+    def start(self, stage: str) -> None:
+        print(
+            f"[CCMS] {self.document} | {stage} ...",
+            flush=True,
+        )
+
+    def __setitem__(self, stage: str, seconds: float) -> None:
+        super().__setitem__(stage, seconds)
+        print(
+            f"[CCMS] {self.document} | {stage} done in "
+            f"{seconds:.1f}s  ({self._memory()})",
+            flush=True,
+        )
+
+
 def run_pipeline(
     pdf_bytes: bytes,
     filename: str,
@@ -857,10 +895,12 @@ def run_pipeline(
         time.perf_counter()
     )
 
-    timings = {}
-
     document_name = (
         Path(filename).stem
+    )
+
+    timings = PipelineLog(
+        document_name
     )
 
     # ======================================================
@@ -875,6 +915,8 @@ def run_pipeline(
     # ======================================================
     # 1. OCR
     # ======================================================
+
+    timings.start("OCR")
 
     stage_start = (
         time.perf_counter()
@@ -947,6 +989,8 @@ def run_pipeline(
     # ======================================================
     # 2 + 3. LEGAL EXTRACTION + PRAYER (parallel)
     # ======================================================
+
+    timings.start("Legal Extraction + Prayer")
     # Both are pure regex/LLM calls on the same ocr_text
     # with no dependency on each other.
 
@@ -974,6 +1018,8 @@ def run_pipeline(
     # 4. BGE-M3
     # ======================================================
 
+    timings.start("BGE-M3")
+
     stage_start = (
         time.perf_counter()
     )
@@ -992,6 +1038,8 @@ def run_pipeline(
     # ======================================================
     # 5. CHUNKING
     # ======================================================
+
+    timings.start("Chunking")
 
     stage_start = (
         time.perf_counter()
@@ -1028,6 +1076,8 @@ def run_pipeline(
     # 6. EMBEDDINGS
     # ======================================================
 
+    timings.start("Embeddings")
+
     stage_start = (
         time.perf_counter()
     )
@@ -1052,8 +1102,10 @@ def run_pipeline(
     )
 
     # ======================================================
-    # 7. QDRANT
+    # 7. VECTOR STORE
     # ======================================================
+
+    timings.start("Vector Store")
 
     stage_start = (
         time.perf_counter()
@@ -1067,7 +1119,7 @@ def run_pipeline(
     )
 
     timings[
-        "Qdrant"
+        "Vector Store"
     ] = (
         time.perf_counter()
         - stage_start
@@ -1076,6 +1128,8 @@ def run_pipeline(
     # ======================================================
     # 8. HYBRID RETRIEVER
     # ======================================================
+
+    timings.start("BM25 + Hybrid")
 
     stage_start = (
         time.perf_counter()
@@ -1104,6 +1158,8 @@ def run_pipeline(
     # 9. ACT + SECTION EXTRACTION
     # ======================================================
 
+    timings.start("Act Extraction")
+
     stage_start = (
         time.perf_counter()
     )
@@ -1123,6 +1179,7 @@ def run_pipeline(
                 [],
             ),
             top_k=5,
+            text=ocr_text,
         )
     )
 
@@ -1136,6 +1193,8 @@ def run_pipeline(
     # ======================================================
     # 10. SURVEY LOCATIONS
     # ======================================================
+
+    timings.start("Survey Locations")
 
     stage_start = (
         time.perf_counter()
@@ -1809,39 +1868,9 @@ with right:
                     or ""
                 ).strip()
 
-                parts = []
-
-                for key, label in [
-                    (
-                        "village",
-                        "Village",
-                    ),
-                    (
-                        "hobli",
-                        "Hobli",
-                    ),
-                    (
-                        "taluk",
-                        "Taluk",
-                    ),
-                    (
-                        "district",
-                        "District",
-                    ),
-                ]:
-
-                    value = (
-                        location.get(
-                            key
-                        )
-                    )
-
-                    if value:
-
-                        parts.append(
-                            f"{label}: "
-                            f"{value}"
-                        )
+                parts = format_location_parts(
+                    location
+                )
 
                 st.markdown(
                     '<div class="location-row">'

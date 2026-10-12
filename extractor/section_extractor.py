@@ -38,7 +38,7 @@ class SectionExtractor:
         (?:Section|Sec\.?|S\.)
         \s*
         ({SECTION_VALUE})
-        \b
+        (?![A-Za-z0-9])
         """,
 
         rf"""
@@ -46,7 +46,7 @@ class SectionExtractor:
         Sections
         \s*
         ({SECTION_VALUE})
-        \b
+        (?![A-Za-z0-9])
         """,
 
         rf"""
@@ -54,7 +54,7 @@ class SectionExtractor:
         u/s
         \s*
         ({SECTION_VALUE})
-        \b
+        (?![A-Za-z0-9])
         """,
 
         rf"""
@@ -62,7 +62,7 @@ class SectionExtractor:
         under\s+(?:Section|Sec\.?)
         \s*
         ({SECTION_VALUE})
-        \b
+        (?![A-Za-z0-9])
         """,
     ]
 
@@ -169,7 +169,55 @@ class SectionExtractor:
             value,
         )
 
+        value = self._drop_word_suffix(
+            value.strip()
+        )
+
         return value.strip()
+
+    # ======================================================
+    # DROP WORD SUFFIX
+    # ======================================================
+
+    @staticmethod
+    def _drop_word_suffix(
+        value: str,
+    ) -> str:
+        """
+        The optional letter suffix in SECTION_VALUE also swallows the
+        next word: "U/s 67 of the Act" -> "67 of". Keep the number and
+        drop letters that are not a real suffix (94A, 94-B, 79 AA).
+
+        A suffix separated by a space must be upper-case, so
+        "Section 4 a notification" gives "4", not "4A".
+        """
+
+        match = re.fullmatch(
+            r"(\d+)(\s?-?)([A-Za-z]{1,3})((?:\([A-Za-z0-9]{1,4}\))*)",
+            value,
+        )
+
+        if not match:
+            return value
+
+        number, separator, suffix, brackets = match.groups()
+
+        is_suffix = (
+            # A hyphen is deliberate notation ("94-G", "5-G").
+            "-" in separator
+            or (
+                suffix.upper() in VALID_SECTION_SUFFIXES
+                and (
+                    " " not in separator
+                    or suffix.isupper()
+                )
+            )
+        )
+
+        if is_suffix:
+            return value
+
+        return number + brackets
 
     # ======================================================
     # VALIDATE SECTION
